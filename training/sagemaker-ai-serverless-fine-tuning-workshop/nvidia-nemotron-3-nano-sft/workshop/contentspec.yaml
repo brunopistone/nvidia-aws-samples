@@ -1,0 +1,38 @@
+version: 2.0
+
+defaultLocaleCode: en-US
+localeCodes:
+  - en-US
+
+awsAccountConfig:
+  participantRole:
+    iamPolicies:
+      - static/cfn/iam_policy.json
+  accountSources:
+    - WorkshopStudio
+  regionConfiguration:
+    minAccessibleRegions: 1
+    maxAccessibleRegions: 1
+    accessibleRegions:
+      recommended:
+        - us-east-1
+        - us-west-2
+    deployableRegions:
+      recommended:
+        - us-east-1
+        - us-west-2
+infrastructure:
+  cloudformationTemplates:
+    - templateLocation: static/cfn/workshop-setup.yaml
+      label: sagemaker-setup
+      participantAllStackOutputsVisible: true
+  requiredResources:
+    sagemaker:
+      - type: endpoint/ml.g5.12xlarge
+        quantity: 1
+
+params:
+  hello: world
+  foo:
+    - bar
+  email: sanravee@amazon.com, bpistone@amazon.com, clockhart@nvidia.com

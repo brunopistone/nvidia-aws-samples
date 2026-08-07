@@ -1,8 +1,6 @@
-version: 2.0
-
-defaultLocaleCode: en-US
+defaultLocaleCode: en
 localeCodes:
-  - en-US
+  - en
 
 awsAccountConfig:
   participantRole:
@@ -30,9 +28,8 @@ infrastructure:
     sagemaker:
       - type: endpoint/ml.g5.12xlarge
         quantity: 1
-
 params:
-  hello: world
-  foo:
-    - bar
-  email: sanravee@amazon.com, bpistone@amazon.com, clockhart@nvidia.com
+  author: Bruno Pistone, Nicolas Jourdan, Christian Kamwangala, Hossam Basudan
+  description: Serverless Model Customization on SageMaker AI
+  emailContact: bpistone@amazon.com, basudan@amazon.ae, kamwang@amazon.fr, njourdan@amazon.de
+version: 2.0

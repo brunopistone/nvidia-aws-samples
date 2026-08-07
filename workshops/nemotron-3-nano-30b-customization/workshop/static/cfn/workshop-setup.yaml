@@ -783,6 +783,34 @@ Resources:
               - Effect: "Allow"
                 Action: "bedrock:*"
                 Resource: "*"
+        # The first invocation of a third-party Bedrock model (for example Anthropic
+        # Claude, used as the frontier baseline in lab 1) makes Bedrock open an AWS
+        # Marketplace subscription on the caller's behalf. Without these actions that
+        # subscription fails and the InvokeModel/Converse call returns AccessDenied.
+        # The SDK pre-flights the execution role before submitting a job, using the
+        # read-only iam:SimulatePrincipalPolicy API. Without it every job logs
+        # "Could not verify permissions for role ... Proceeding with it."
+        # sagemaker-mlflow is required for training runs to log to MLflow and is not
+        # covered by AmazonSageMakerFullAccess.
+        - PolicyName: !Sub "${AWS::StackName}-RoleSelfCheckAndMlflow"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "iam:SimulatePrincipalPolicy"
+                  - "sagemaker-mlflow:*"
+                Resource: "*"
+        - PolicyName: !Sub "${AWS::StackName}-MarketplaceSubscribe"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "aws-marketplace:Subscribe"
+                  - "aws-marketplace:Unsubscribe"
+                  - "aws-marketplace:ViewSubscriptions"
+                Resource: "*"
       ManagedPolicyArns:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSageMakerFullAccess"
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonS3FullAccess"
@@ -833,148 +861,9 @@ Resources:
             DefaultEbsVolumeSizeInGb: 5
             MaximumEbsVolumeSizeInGb: 100
 
-  LifeCycleConfigLambdaRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      Path: /
-      Policies:
-        - PolicyName: !Sub 'LifeCycleConfigLambdaPolicy-${AWS::StackName}'
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'sagemaker:CreateStudioLifecycleConfig'
-                  - 'sagemaker:DeleteStudioLifecycleConfig'
-                Resource: !Sub 'arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:studio-lifecycle-config/*'
-              - Effect: Allow
-                Action:
-                  - 'sagemaker:UpdateUserProfile'
-                  - 'sagemaker:DeleteUserProfile'
-                Resource: !Sub 'arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:user-profile/*'
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-
-  LifeCycleConfigLambda:
-    DependsOn:
-      - StudioUserProfile
-    Type: 'AWS::Lambda::Function'
-    Properties:
-      Description: Add LifeCycle Configuration to copy workshop files to Studio
-      Handler: index.lambda_handler
-      Role: !GetAtt LifeCycleConfigLambdaRole.Arn
-      Runtime: python3.10
-      Timeout: 60
-      Code:
-        ZipFile: !Join
-          - |+
-
-          - - 'import boto3'
-            - 'import base64'
-            - 'import cfnresponse'
-            - ''
-            - 'client = boto3.client(''sagemaker'')'
-            - 'lcc_up1 = ''\n''.join(('
-            - '    ''#!/bin/bash'','
-            - '    '''','
-            - '    ''set -ex'','
-            - '    '''','
-            - '    ''if [ ! -z "${SM_JOB_DEF_VERSION}" ]'','
-            - '    ''then'','
-            - '    ''   echo "Running in job mode, skip lcc"'','
-            - '    ''else'','
-            - '    ''   git clone https://github.com/NVIDIA/nvidia-aws-samples.git || { echo "Error: Failed to clone repository"; exit 0; }'','
-            - '    ''   echo "Files cloned from GitHub repo"'','
-            - '    ''fi'','
-            - '    '''','
-            - '))'
-            - ''
-            - !Sub 'lcc_name_up1 = "${AWS::StackName}-clone-repo"'
-            - !Sub 'up1 = "${StudioUserProfile}"'
-            - ''
-            - 'def get_lcc_base64_string(lcc_string):'
-            - '    lcc_bytes = lcc_string.encode("ascii")'
-            - '    base64_lcc_bytes = base64.b64encode(lcc_bytes)'
-            - '    base64_lcc_string = base64_lcc_bytes.decode("ascii")'
-            - '    return base64_lcc_string'
-            - ''
-            - ''
-            - 'def apply_lcc_to_user_profile(base64_lcc_string, lcc_config_name, profile):'
-            - '    response = client.create_studio_lifecycle_config('
-            - '        StudioLifecycleConfigName=lcc_config_name,'
-            - '        StudioLifecycleConfigContent=base64_lcc_string,'
-            - '        StudioLifecycleConfigAppType="JupyterLab",'
-            - '   )'
-            - ''
-            - '    lcc_arn = response["StudioLifecycleConfigArn"]'
-            - '    update_up = client.update_user_profile('
-            - '        DomainId=profile.split("|")[1],'
-            - '        UserProfileName=profile.split("|")[0],'
-            - '        UserSettings={'
-            - '            "JupyterLabAppSettings": {'
-            - '                "DefaultResourceSpec": {"LifecycleConfigArn": lcc_arn},'
-            - '                "LifecycleConfigArns": [lcc_arn]'
-            - '            }'
-            - '        }'
-            - '    )'
-            - '    return update_up'
-            - ''
-            - ''
-            - 'def lambda_handler(event, context):'
-            - '    print(event)'
-            - '    try:'
-            - '        base64_lcc_up1_string = get_lcc_base64_string(lcc_up1)'
-            - '        updated_up1 = apply_lcc_to_user_profile('
-            - '            base64_lcc_up1_string,'
-            - '            lcc_name_up1,'
-            - '            up1'
-            - '        )'
-            - '        print("Response User Profile LCC update for UP1")'
-            - '        print(updated_up1)'
-            - ''
-            - '        response_value = 120'
-            - '        response_data = {"Data": response_value}'
-            - '        cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)'
-            - '    except Exception as e:'
-            - '        if "RequestType" in event:'
-            - '            if event["RequestType"] == "Delete":'
-            - '                try:'
-            - '                    response1 = client.delete_studio_lifecycle_config('
-            - '                        StudioLifecycleConfigName=lcc_name_up1'
-            - '                    )'
-            - '                    print(response1)'
-            - '                    response_data = {}'
-            - '                    cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)'
-            - '                    return'
-            - '                except Exception as e2:'
-            - '                    print(e2)'
-            - '                    response_data = e2'
-            - '                    cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)'
-            - '                    return'
-            - '        print(e)'
-            - '        response_data = {"Data": str(e)}'
-            - '        cfnresponse.send(event, context, cfnresponse.FAILED, response_data)'
-
-  LifeCycleConfigLambdaInvoke:
-    Type: AWS::CloudFormation::CustomResource
-    Version: "1.0"
-    Properties:
-      ServiceToken: !GetAtt LifeCycleConfigLambda.Arn
-
   JupyterLabSpace:
     Type: AWS::SageMaker::Space
-    DependsOn: 
-      - LifeCycleConfigLambdaInvoke
-      - StudioUserProfile
+    DependsOn: StudioUserProfile
     Properties:
       DomainId: !Ref StudioDomain
       SpaceName: !Sub "${SageMakerStudioDefaultUserName}-jupyterlab-space"

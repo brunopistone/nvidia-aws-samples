@@ -4,10 +4,10 @@
 # (b) can be served by the SageMaker LMI/DJL container and imported into
 # Amazon Bedrock Custom Model Import.
 #
-# Verified end-to-end in this lab: huggingface-reasoning-qwen3-4b
+# Verified end-to-end in this lab: huggingface-reasoning-NVIDIA-Nemotron-3-Nano-30B
 #
-# Known NOT to work end-to-end: huggingface-vlm-qwen3-5-4b (Qwen3.5). Training
-# succeeds, but no current LMI container recognises model type `qwen3_5`, so
+# Known NOT to work end-to-end: huggingface-vlm-NVIDIA-Nemotron-3-Nano-30B3-5-4b (NVIDIA-Nemotron-3-Nano-30B3.5). Training
+# succeeds, but no current LMI container recognises model type `NVIDIA-Nemotron-3-Nano-30B3_5`, so
 # notebooks 4 and 4a fail.
 BASE_MODEL_ID = "huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16"
 

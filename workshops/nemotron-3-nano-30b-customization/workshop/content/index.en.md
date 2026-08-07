@@ -1,87 +1,64 @@
 ---
-title: "Serverless Model Customization with Amazon SageMaker AI"
+title: "Fine-tune NVIDIA Nemotron 3 model on Amazon SageMaker AI serverless Model Customization"
 weight: 0
 ---
 
-:image[SageMaker AI]{src="/static/images/sagemaker.jpeg" height=384}
+Welcome to the **Fine-tune NVIDIA Nemotron 3 model on Amazon SageMaker AI serverless Model Customization** workshop!
 
----
+In this hands-on workshop, you'll experience how Amazon SageMaker AI serverless model customization changes the way developers fine-tune foundation models. Starting from the pre-trained **NVIDIA Nemotron 3 Nano 30B-A3B** model, you will prepare a dataset, run a Supervised Fine-Tuning (SFT) job with LoRA, evaluate the improvements, and deploy the customized model for inference — all without provisioning or managing any training infrastructure.
 
-Welcome to the _Serverless Model Customization with Amazon SageMaker AI_ workshop.
+Working directly in SageMaker AI Studio JupyterLab, you'll take an open-weight NVIDIA Nemotron 3 model through the complete customization lifecycle: data preparation, serverless fine-tuning, evaluation, and deployment.
 
-In this workshop, you will learn how to:
+## 🎯 The task
 
-1. Use the new serverless customization capability in Amazon SageMaker AI
-2. Fine-tune popular AI models with just a few clicks—no infrastructure management required
-3. Deploy customized models to Amazon Bedrock or SageMaker endpoints
-4. Evaluate your customized models using built-in tools
+You will teach the model a strict, easily verifiable behaviour using the [Multilingual-Thinking](https://huggingface.co/datasets/HuggingFaceH4/Multilingual-Thinking) dataset: **reason inside `<think>...</think>` tags in a target non-English language** (Spanish, French, Italian or German, selected via the system prompt), then **give the final answer in English**.
 
-# What is Serverless Model Customization?
+## 📚 What You'll Learn
 
-Serverless customization in Amazon SageMaker AI provides an easy-to-use interface for the latest fine-tuning techniques. You can accelerate the AI model customization process from months to days—all entirely serverless so you can focus on model tuning rather than managing infrastructure.
+- How to use SageMaker AI serverless Model Customization to fine-tune foundation models
+- How to customize NVIDIA Nemotron 3 models without any infrastructure provisioning or management
+- How to apply Supervised Fine-Tuning (SFT) with LoRA to a selected NVIDIA Nemotron 3 model
+- How to evaluate fine-tuned models with automated LLM-as-a-Judge metrics tailored to your use case
+- How to serve the customized model on a SageMaker real-time endpoint with vLLM
 
-When you choose serverless customization, SageMaker AI automatically selects and provisions the appropriate compute resources based on the model and data size. You only pay for the tokens processed during training and inference.
+::alert[**Important note** This workshop uses the **SFT** fine-tuning technique and walks through the full model customization lifecycle: data preparation, training, evaluation, and deployment. Each lab provides guided instructions so you can follow along step-by-step. The [Prerequisites](/01-prerequisites/) module is mandatory before running any other module.]{type="info"}
 
-## Supported Models
+### 🎓 Workshop modules
 
-Serverless customization supports popular AI models including:
+| Module | ⏰ Duration | 🔥 Level | 👥 Target Audience |
+|--------|----------|-------|-----------------|
+| 1. [Prerequisites](/01-prerequisites/) | 10-15 mins | Basic | All participants preparing setup and environment access |
+| 2. [Lab: Supervised Fine-Tuning (SFT)](/02-lab-sft/) | 50-60 mins | Advanced | Data scientists and AI practitioners |
+| 3. [Lab: Inference](/03-lab-inference/) | 40-50 mins | Advanced | ML engineers and data scientists |
+| 4. [Clean Up](/04-cleanup/) | 5-10 mins | Basic | All participants |
+| 5. [Summary](/05-summary/) | 5 mins | Basic | All participants |
 
-- **Google Gemma 4** - Lightweight open models from Google
-- **Qwen** - Multilingual models from Alibaba
-- **NVIDIA Nemotron 3** - Open reasoning models from NVIDIA
-- **Amazon Nova** - Amazon's foundation models
-- **Meta Llama** - Open-source LLMs from Meta
-- **DeepSeek** - Advanced reasoning models
-- **GPT-OSS** - Open-source GPT variants
+### 🔢 How to run the workshop
 
-## Customization Techniques
+This workshop follows a hands-on, self-paced format. Each module walks through Jupyter notebooks that you run in your own JupyterLab environment (setup instructions are in the prerequisites section). The notebooks include:
 
-SageMaker AI supports multiple customization techniques, each suited for different stages of the model training process:
+- Step-by-step instructions and explanations
+- Code samples that you can run and modify
+- Links to additional resources
 
-:image[Model customization techniques]{src="/static/images/general/customization_techniques.jpg" height=384}
+### 🔗 Workshop GitHub repository
 
-| Technique                                                 | Description                                                 |
-| --------------------------------------------------------- | ----------------------------------------------------------- |
-| **Supervised Fine-Tuning (SFT)**                          | Train models on labeled input-output pairs                  |
-| **Direct Preference Optimization (DPO)**                  | Align models with human preferences without reward modeling |
-| **Reinforcement Learning from Verifiable Rewards (RLVR)** | Optimize models using verifiable reward signals             |
-| **Reinforcement Learning from AI Feedback (RLAIF)**       | Use AI-generated feedback for model alignment               |
+The workshop notebooks are available in the public [nvidia-aws-samples](https://github.com/NVIDIA/nvidia-aws-samples) GitHub repository, under `workshops/nemotron-3-nano-30b-customization/code/`.
 
-All customization techniques in this workshop use **Parameter Efficient Fine-Tuning (PEFT)** with **LoRA** adapters. Instead of updating all model parameters, LoRA trains a small set of low-rank weight matrices — dramatically reducing GPU memory requirements and training cost while maintaining model quality.
+We welcome you to bookmark and star the repository for access to future content we publish.
 
-:image[Full Fine-Tuning vs PEFT/LoRA]{src="/static/images/general/peft_lora_concept.jpeg" height=384}
+### Disclaimers
 
-# Objective of this Workshop
+::alert[All code is covered under the [MIT-0 license](https://github.com/aws/mit-0)]
+::alert[Please remember to clean up all resources created during this workshop to avoid ongoing charges to your AWS account.]
 
-Learn how to customize AI models using the new serverless capability in Amazon SageMaker AI. Through hands-on exercises, you'll:
+### Security Best Practices
 
-- Select and configure models for customization
-- Prepare and upload training datasets
-- Launch serverless fine-tuning jobs
-- Monitor training progress with MLflow
-- Deploy customized models for inference
-- Evaluate model performance
+Throughout this workshop, we adhere to AWS service security best practices. We encourage you to familiarize yourself with the [AWS Security Best Practices](https://aws.amazon.com/architecture/security-identity-compliance/) and apply them in your own implementations. Key points include:
 
-# Workshop Structure
+- Using IAM roles and policies with least privilege
+- Encrypting data at rest and in transit
+- Implementing network security controls
+- Regularly monitoring and auditing your resources
 
-1. **Setup** - Access SageMaker Studio and explore the Models interface
-2. **Prepare Dataset** - Format your training data for the selected customization technique
-3. **Customize Model** - Launch a serverless fine-tuning job using the UI
-4. **Deploy Model** - Deploy your customized model to Amazon Bedrock or SageMaker
-5. **Evaluate** - Test and compare your customized model against the base model
-
-# Key Benefits
-
-- **No infrastructure management** - Focus on model tuning, not compute provisioning
-- **Pay-per-token pricing** - Only pay for tokens processed during training
-- **Built-in MLflow integration** - Automatic experiment tracking and visualization
-- **Flexible deployment** - Deploy to Bedrock for serverless inference or SageMaker for custom endpoints
-- **Multiple techniques** - Choose from SFT, DPO, RLVR, or RLAIF based on your use case
-
-# Prerequisites
-
-To get the most out of this workshop, you should have:
-
-- **AWS Familiarity** - Basic understanding of AWS services and console navigation
-- **Machine Learning Basics** - Understanding of fundamental ML concepts like training and evaluation
-- **Data Preparation** - Familiarity with preparing datasets in JSON/JSONL format
+Remember to always follow security best practices when working with AWS services and sensitive data.

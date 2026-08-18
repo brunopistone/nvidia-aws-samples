@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "Bash(cp 3-evaluation.ipynb /tmp/3-evaluation.full.bak.ipynb)",
+      "Bash(cp /tmp/3-evaluation.full.bak.ipynb /Users/clockhart/Desktop/workshops/sagemaker-serverless-fine-tuning/nvidia-aws-samples/workshops/nemotron-3-nano-30b-customization/code/3-evaluation.ipynb)",
+      "Read(//private/tmp/**)",
+      "Bash(cp /tmp/3-evaluation.full.bak.ipynb 3-evaluation.ipynb)"
+    ]
+  }
+}

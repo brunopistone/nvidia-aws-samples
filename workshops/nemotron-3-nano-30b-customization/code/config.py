@@ -4,12 +4,10 @@
 # (b) can be served by the SageMaker LMI/DJL container and imported into
 # Amazon Bedrock Custom Model Import.
 #
-# Verified end-to-end in this lab: huggingface-reasoning-NVIDIA-Nemotron-3-Nano-30B
-#
-# Known NOT to work end-to-end: huggingface-vlm-NVIDIA-Nemotron-3-Nano-30B3-5-4b (NVIDIA-Nemotron-3-Nano-30B3.5). Training
-# succeeds, but no current LMI container recognises model type `NVIDIA-Nemotron-3-Nano-30B3_5`, so
-# notebooks 4 and 4a fail.
+# This branch trains Nemotron 3 Nano, a reasoning model. Notebook 1 prefixes every
+# training completion with an empty reasoning block so the model answers instead of
+# reasoning past the output budget. See nemotron_support.py for why.
 BASE_MODEL_ID = "huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16"
 
 # Fixed dataset / resource names used across the notebooks
-DATASET_PREFIX = "contractnli-nda-review"
+DATASET_PREFIX = "contractnli-nda-review-nothink"

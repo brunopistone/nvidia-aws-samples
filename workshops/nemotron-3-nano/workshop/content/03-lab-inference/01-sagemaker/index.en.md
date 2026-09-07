@@ -5,18 +5,17 @@ weight: 1
 
 We are now ready to deploy the fine-tuned model to a SageMaker AI real-time endpoint.
 
-Two deployment options exist, and they suit different demand shapes:
+Two ways to serve a customized model exist, and they suit different demand shapes. This section deploys the first:
 
-|                | this section                                | [Bedrock Deployment](../02-bedrock)                  |
-| -------------- | ------------------------------------------- | ---------------------------------------------------- |
 |                | **SageMaker AI real-time endpoint**         | **Bedrock Custom Model Import**                      |
+| -------------- | ------------------------------------------- | ---------------------------------------------------- |
 | infrastructure | dedicated GPU instance you choose           | fully serverless                                     |
 | billing        | per instance-hour, 24/7 while it exists     | per Custom Model Unit in 5-minute active windows     |
 | idle cost      | **you keep paying**                         | scales to zero                                       |
 | cold start     | none once `InService`                       | tens of seconds after idle                           |
 | best for       | steady high throughput                      | spiky or low-volume workloads                        |
 
-Deploy whichever matches how you would serve the model.
+Read the right-hand column as the trade you are making by choosing an endpoint: you pay for idle time in exchange for no cold start.
 
 The real-time path involves six steps:
 

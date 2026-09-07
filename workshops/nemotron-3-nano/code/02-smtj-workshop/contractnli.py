@@ -8,25 +8,45 @@ Everything that constitutes the *lesson* — calling a model, parsing its answer
 scoring it — lives in the notebooks, where you can read it.
 
   1. the data       ensure_dataset, load, doc_spans, gold_for
-  2. one string     INSTRUCTION, build_prompt
-  3. chat turns     SYSTEM, USER, build_system, build_user, build_messages
+  2. chat turns     SYSTEM, USER, build_system, build_user, build_messages
+  3. inspection     INSTRUCTION, build_prompt
 
-Plus NO_THINK, the switch both formats append.
+Plus CHAT_TEMPLATE_KWARGS, the switch that turns reasoning off.
 
-The prompt is rendered two ways because the callers need two shapes, and they are
-deliberately not interchangeable:
+`build_messages` is the one rendering that matters. Every caller uses it:
 
-  build_prompt    one string, contract then checklist. Notebook 1 writes it into every
-                  training record (`prompt`/`completion`) and every test record
-                  (`query`/`response`), so the trained prompt has exactly one source.
+  training      notebook 1 writes `prompt` (system + user turns) and `completion`
+                (the assistant turn) into each record, and TRL applies the model's own
+                chat template to them inside the training job.
+  serving       notebook 3 sends the same turns to the vLLM endpoint, which applies the
+                same chat template.
+  baseline      notebook 4 sends the same turns to Bedrock Converse.
 
-  build_messages  system + user turns, checklist in the system turn and the contract in
-                  the user turn. For APIs that take roles rather than a single string:
-                  the Bedrock Converse baseline in notebook 3, and serving in 4 and 4a.
+So the string the model trains on and the string it is asked at inference time are
+produced by one function and rendered by one template. There is no train/serve skew to
+reason about, which is the main thing the messages format buys here.
 
-Same instruction, same checklist, same `/no_think` — but a different order, so the two
-are not byte-identical and neither is a drop-in for the other. Change the wording in
-both or in neither.
+`build_prompt` renders the same content as a single flat string. Nothing trains or
+serves through it — it exists so notebook 1 can print the whole request and measure its
+length in one piece.
+
+TURNING REASONING OFF. Nemotron 3 Nano is a reasoning model: asked to deliberate over a
+17-item checklist it will spend its whole generation budget inside <think> and get cut
+off before the JSON. The switch is NOT a magic string in the prompt — this model's chat
+template takes an `enable_thinking` flag:
+
+    {%- set enable_thinking = enable_thinking if enable_thinking is defined else True %}
+    ...
+    {%- if enable_thinking %}
+        {{- '<|im_start|>assistant\\n<think>\\n' }}
+    {%- else %}
+        {{- '<|im_start|>assistant\\n<think></think>' }}
+
+With the flag false the template pre-fills an empty think block, so the model has no
+open <think> to continue and answers directly. It reaches the template three ways, all
+carrying the same dict: as a per-record `chat_template_kwargs` column that TRL forwards
+(training), as `chat_template_kwargs` in the request body (vLLM), and not at all for
+Bedrock, whose models do not share this template.
 """
 
 import io
@@ -90,11 +110,13 @@ def gold_for(doc):
 
 
 # Reasoning models spend their whole generation budget inside <think> on a 17-item
-# checklist and can be cut off before the JSON. Both formats append this switch.
-NO_THINK = "/no_think"
+# checklist and can be cut off before the JSON. This model's chat template takes a flag
+# rather than a magic string in the prompt — see the module docstring for the three
+# places it is passed.
+CHAT_TEMPLATE_KWARGS = {"enable_thinking": False}
 
 
-# -------------------------------------------------------------- Chat completion format
+# -------------------------------------------------------------- Single-string form (inspection only)
 
 INSTRUCTION = """You are a contract review assistant. You review a non-disclosure agreement (NDA) against a fixed checklist of {n} legal hypotheses.
 
@@ -116,20 +138,18 @@ Respond with JSON only, no other text:
 Include an entry for every hypothesis key listed above."""
 
 
-def build_prompt(doc, labels, no_think=True):
-    """Render the single-string prompt for one contract.
+def build_prompt(doc, labels):
+    """Render the whole request for one contract as one flat string.
 
-    The only prompt notebook 1 stores, for all three splits, so what the model trains on
-    and what it is evaluated on are the same string. Note the order: contract first, then
-    checklist, so the last thing the model reads before answering is the question. The
-    two-turn `build_messages` below orders them the other way round.
+    Nothing trains or serves through this. It is here so notebook 1 can print a complete
+    request and measure its length in one piece — the same content `build_messages`
+    splits across two turns, in the order a person would read it.
     """
     spans = "\n".join(f"[{i}] {t}" for i, t in doc_spans(doc))
     checklist = "\n".join(
         f'{k}: {v["hypothesis"]} ({v["short_description"]})' for k, v in labels.items()
     )
-    body = INSTRUCTION.format(n=len(labels), spans=spans, checklist=checklist)
-    return f"{body}\n\n{NO_THINK}" if no_think else body
+    return INSTRUCTION.format(n=len(labels), spans=spans, checklist=checklist)
 
 
 # -------------------------------------------------------------- Messages format
@@ -162,28 +182,26 @@ def build_system(labels):
     return SYSTEM.format(n=len(labels), checklist=checklist)
 
 
-def build_user(doc, no_think=True):
+def build_user(doc):
     """The one contract under review, as numbered spans."""
-    body = USER.format(spans="\n".join(f"[{i}] {t}" for i, t in doc_spans(doc)))
-    return f"{body}\n\n{NO_THINK}" if no_think else body
+    return USER.format(spans="\n".join(f"[{i}] {t}" for i, t in doc_spans(doc)))
 
 
-def build_messages(doc, labels, completion=None, no_think=True):
-    """The chat turns for one contract, for callers that take roles rather than a string.
+def build_messages(doc, labels, completion=None):
+    """The chat turns for one contract. The one rendering every caller uses.
 
-    Pass `completion` to get a full training record (system + user + assistant); omit it
-    to get an inference request (system + user). Every caller that needs turns builds
-    them here, so the turns cannot drift between them.
+    Omit `completion` for an inference request (system + user) — what notebook 3 sends to
+    the endpoint and notebook 4 sends to Bedrock. Pass it to get the assistant turn
+    appended, which is how notebook 1 builds the `completion` half of a training record.
 
-    Not the same string as `build_prompt`: the checklist goes in the system turn, ahead
-    of the contract. Notebook 1 trains on `build_prompt`, so a model served through here
-    is being asked in a different order than it was trained in — which is fine for an
-    instruction this explicit, and is what the serving checks in notebooks 4 and 4a
-    verify rather than assume.
+    Because training, serving and the baseline all go through here, the turns cannot
+    drift between them: the same two dicts are rendered by the same chat template at
+    training time (by TRL, inside the job) and at inference time (by vLLM, in the
+    container). Reword the instruction here and every caller picks it up.
     """
     messages = [
         {"role": "system", "content": build_system(labels)},
-        {"role": "user", "content": build_user(doc, no_think=no_think)},
+        {"role": "user", "content": build_user(doc)},
     ]
     if completion is not None:
         messages.append({"role": "assistant", "content": completion})

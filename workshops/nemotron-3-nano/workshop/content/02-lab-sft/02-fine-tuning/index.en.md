@@ -48,7 +48,7 @@ Want to try a different model? The notebook includes a cell that lists all SageM
 
 ### Create Model Package Group
 
-Model Package Groups organize your fine-tuned model versions. The name is derived from the base model ID with a `-contractnli-sft-mpg` suffix, hash-truncated to SageMaker's 63-character limit when needed. Notebooks 2, 3, 4 and 4a all derive it the same way:
+Model Package Groups organize your fine-tuned model versions. The name is derived from the base model ID with a `-contractnli-sft-mpg` suffix, hash-truncated to SageMaker's 63-character limit when needed. Notebooks 2, 3 and 4 all derive it the same way:
 
 ```python
 import hashlib

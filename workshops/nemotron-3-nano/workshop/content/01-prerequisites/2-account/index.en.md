@@ -36,7 +36,6 @@ Without it, the evaluation pipeline starts but the `EvaluateCustomModelMetrics` 
 - **Amazon Bedrock model access** for the judge model `amazon.nova-pro-v1:0` (request it in the Bedrock console under **Model access**).
 - **SageMaker JumpStart access** to the base model — the training job accepts the EULA programmatically with `accept_eula=True`.
 - **Service quota for `ml.g5.12xlarge` for endpoint usage** (4x NVIDIA A10G), needed for the real-time deployment lab. Request an increase in **Service Quotas** → **Amazon SageMaker** if your account has none.
-- Optional, only for the Bedrock deployment lab: quota increases for `Imported models per account` and `Concurrent model import jobs`.
 
 ## Amazon SageMaker AI Studio
 

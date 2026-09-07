@@ -55,7 +55,6 @@ You will run these notebooks in order:
 | `2-fine-tune-llm.ipynb`       | [Fine-Tuning](/02-lab-sft/02-fine-tuning/)             |
 | `3-evaluation.ipynb`          | [Evaluation](/02-lab-sft/03-evaluation/)               |
 | `4-deployment.ipynb`          | [SageMaker Inference](/03-lab-inference/01-sagemaker/) |
-| `4a-deployment-bedrock.ipynb` | [Bedrock Deployment](/03-lab-inference/02-bedrock/)    |
 
 Select the **`Python 3 (ipykernel)`** kernel when a notebook asks, and run the first cell to install the dependencies from `requirements.txt`.
 

@@ -12,7 +12,6 @@ Complete these cleanup steps to avoid ongoing charges. Inference resources must 
 | Resource                                        | Charged while it exists?                                                            |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
 | SageMaker real-time endpoint (`ml.g5.12xlarge`) | **Yes** — per instance-hour, whether or not you send requests                       |
-| Bedrock imported model                          | **Yes** — monthly storage per Custom Model Unit, plus inference in 5-minute windows |
 | Serverless training / evaluation jobs           | No — they run to completion and stop                                                |
 | SageMaker AI Datasets, Model Package Groups     | Only the underlying S3 storage                                                      |
 | JupyterLab space                                | Per instance-hour while the space is running                                        |
@@ -55,14 +54,6 @@ from sagemaker.core.resources import EndpointConfig
 EndpointConfig.get(endpoint_config_name=endpoint_config_name).delete()
 ```
 
-## Delete the Bedrock imported model
-
-If you ran **`code/4a-deployment-bedrock.ipynb`** in your own account, delete the imported model to stop storage charges:
-
-```python
-bedrock_client.delete_imported_model(modelIdentifier=imported_model_name)
-```
-
 ## Verify Cleanup
 
 Confirm in the SageMaker AI console that nothing is left running:
@@ -70,8 +61,6 @@ Confirm in the SageMaker AI console that nothing is left running:
 1. **SageMaker AI** → **Inference** → **Endpoints** — the endpoint is gone
 2. **SageMaker AI** → **Inference** → **Models** — the model is gone
 3. **SageMaker AI** → **Inference** → **Endpoint configurations** — the config is gone
-
-If you deployed to Bedrock, also check **Amazon Bedrock** → **Imported models**.
 
 ## Optional: remove registry entries and artifacts
 

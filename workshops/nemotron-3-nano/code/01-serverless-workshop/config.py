@@ -8,7 +8,7 @@
 #
 # Known NOT to work end-to-end: huggingface-vlm-NVIDIA-Nemotron-3-Nano-30B3-5-4b (NVIDIA-Nemotron-3-Nano-30B3.5). Training
 # succeeds, but no current LMI container recognises model type `NVIDIA-Nemotron-3-Nano-30B3_5`, so
-# notebooks 4 and 4a fail.
+# notebook 4 fails.
 BASE_MODEL_ID = "huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16"
 
 # Fixed dataset / resource names used across the notebooks

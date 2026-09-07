@@ -42,7 +42,7 @@ Every notebook in the lab opens with `import contractnli as C`. The module holds
 | `C.gold_for(doc)`            | `{"nda-1": {"choice", "spans"}, ...}`    | the expert answer for one contract           |
 | `C.build_prompt(doc, labels)` | one string                              | **the whole request** — instruction, contract, checklist |
 
-The module also carries a two-turn `messages` variant of the same instruction — `C.build_system(labels)`, `C.build_user(doc)` and `C.build_messages(doc, labels, completion=None)`. Nothing in data preparation uses it. It exists for the callers that need role-tagged turns rather than a string: the frontier baseline in [Evaluation](../03-evaluation), which goes through the Bedrock Converse API, and the serving checks in [Deployment](../04-deployment).
+The module also carries a two-turn `messages` variant of the same instruction — `C.build_system(labels)`, `C.build_user(doc)` and `C.build_messages(doc, labels, completion=None)`. Nothing in data preparation uses it. It exists for the callers that need role-tagged turns rather than a string: the frontier baseline in [Evaluation](../03-evaluation), which goes through the Bedrock Converse API, and the serving check in [Deployment](/03-lab-inference/01-sagemaker/).
 
 :::alert{header="The two formats are not interchangeable" type="warning"}
 Both carry the same instruction, the same checklist and the same `/no_think` switch, but they order them differently: `build_prompt` puts the contract *before* the checklist, while `build_messages` puts the checklist in the system turn, *ahead* of the contract. So they are not the same string, and neither is a drop-in for the other.

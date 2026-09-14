@@ -1,3 +1,5 @@
+import re
+
 # Base model for this lab.
 #
 # A Hugging Face model id, not a JumpStart one: this lab customizes the model with a
@@ -8,6 +10,16 @@
 # this lab exists alongside the 30B-A3B serverless one: same dataset, same task, same
 # four steps, different training backend.
 BASE_MODEL_ID = "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16"
+
+# A Hugging Face id is not a legal SageMaker resource name: every job, model, endpoint and
+# endpoint config has to match
+#
+#     ([a-zA-Z0-9]([a-zA-Z0-9-]){0,62})(?<!-)
+#
+# so the `nvidia/` org prefix alone makes `BASE_MODEL_ID` unusable - `ValidationException:
+# Member must satisfy regular expression pattern`. Drop the org and collapse anything that
+# is not alphanumeric into a hyphen, once, here, so every notebook derives the same names.
+MODEL_SLUG = re.sub(r"[^a-zA-Z0-9]+", "-", BASE_MODEL_ID.split("/")[-1]).strip("-")
 
 # Fixed dataset / resource names used across the notebooks
 DATASET_PREFIX = "contractnli-nda-review"
@@ -22,7 +34,7 @@ DATA_PREFIX = f"datasets/{DATASET_PREFIX}"
 # `<TRAIN_JOB_PREFIX>-<timestamp>` and its artifacts land under
 # `s3://<bucket>/[<prefix>/]<TRAIN_JOB_PREFIX>/<full-job-name>/output/model.tar.gz`.
 #
-# Derived once, here, because notebook 2 uses it as `base_job_name` and notebook 3 uses it
+# Derived once, here, because notebook 2 uses it as `base_job_name` and notebook 4 uses it
 # to find the last completed job. In the reference workshop this interpolation is written
 # out in both notebooks, so editing one and not the other silently deploys the wrong run.
-TRAIN_JOB_PREFIX = f"train-{BASE_MODEL_ID.split('/')[-1].replace('.', '-')}-sft"
+TRAIN_JOB_PREFIX = f"train-{MODEL_SLUG}-sft"

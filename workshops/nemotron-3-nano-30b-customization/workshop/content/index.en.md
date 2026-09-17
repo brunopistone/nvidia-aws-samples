@@ -9,11 +9,13 @@ In this hands-on workshop, you'll experience how Amazon SageMaker AI serverless 
 
 Working directly in SageMaker AI Studio JupyterLab, you'll take an open-weight NVIDIA Nemotron 3 model through the complete customization lifecycle: data preparation, serverless fine-tuning, evaluation, and deployment.
 
-## 🎯 The task
+## The task
 
-You will teach the model a strict, easily verifiable behaviour using the [Multilingual-Thinking](https://huggingface.co/datasets/HuggingFaceH4/Multilingual-Thinking) dataset: **reason inside `<think>...</think>` tags in a target non-English language** (Spanish, French, Italian or German, selected via the system prompt), then **give the final answer in English**.
+You will fine-tune the model on **automated contract review** using the [ContractNLI](https://stanfordnlp.github.io/contract-nli/) dataset: given a non-disclosure agreement and a fixed checklist of 17 legal hypotheses, the model must classify each hypothesis as `Entailment`, `Contradiction`, or `NotMentioned`, and cite the specific contract clauses (spans) that justify each decision.
 
-## 📚 What You'll Learn
+This is a structured reasoning task — the output is strict JSON with one entry per hypothesis. The model must read the full contract and reason per-item, not retrieve a single passage per question.
+
+## What You'll Learn
 
 - How to use SageMaker AI serverless Model Customization to fine-tune foundation models
 - How to customize NVIDIA Nemotron 3 models without any infrastructure provisioning or management
@@ -23,9 +25,9 @@ You will teach the model a strict, easily verifiable behaviour using the [Multil
 
 ::alert[**Important note** This workshop uses the **SFT** fine-tuning technique and walks through the full model customization lifecycle: data preparation, training, evaluation, and deployment. Each lab provides guided instructions so you can follow along step-by-step. The [Prerequisites](/01-prerequisites/) module is mandatory before running any other module.]{type="info"}
 
-### 🎓 Workshop modules
+### Workshop modules
 
-| Module | ⏰ Duration | 🔥 Level | 👥 Target Audience |
+| Module | ⏰ Duration | Level | Target Audience |
 |--------|----------|-------|-----------------|
 | 1. [Prerequisites](/01-prerequisites/) | 10-15 mins | Basic | All participants preparing setup and environment access |
 | 2. [Lab: Supervised Fine-Tuning (SFT)](/02-lab-sft/) | 50-60 mins | Advanced | Data scientists and AI practitioners |
@@ -33,7 +35,7 @@ You will teach the model a strict, easily verifiable behaviour using the [Multil
 | 4. [Clean Up](/04-cleanup/) | 5-10 mins | Basic | All participants |
 | 5. [Summary](/05-summary/) | 5 mins | Basic | All participants |
 
-### 🔢 How to run the workshop
+### How to run the workshop
 
 This workshop follows a hands-on, self-paced format. Each module walks through Jupyter notebooks that you run in your own JupyterLab environment (setup instructions are in the prerequisites section). The notebooks include:
 
@@ -41,7 +43,7 @@ This workshop follows a hands-on, self-paced format. Each module walks through J
 - Code samples that you can run and modify
 - Links to additional resources
 
-### 🔗 Workshop GitHub repository
+### Workshop GitHub repository
 
 The workshop notebooks are available in the public [nvidia-aws-samples](https://github.com/NVIDIA/nvidia-aws-samples) GitHub repository, under `workshops/nemotron-3-nano-30b-customization/code/`.
 

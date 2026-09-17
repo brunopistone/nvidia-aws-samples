@@ -1,9 +1,9 @@
 ---
-title: "🏁 Getting started - Workshop Studio"
+title: " Getting started - Workshop Studio"
 weight: 11
 ---
 
-# 💻 Sign in to a Workshop Studio AWS Account
+# Sign in to a Workshop Studio AWS Account
 
 If you participate in an AWS Immersion Day, AWS workshop, or a AWS instructor-led event you get access to a temporary AWS Account already pre-configured with Amazon SageMaker AI Studio and all required workshop resources.
 
@@ -20,10 +20,10 @@ Follow the instructions in this section to sign into a pre-provisioned workshop 
 
 1. Follow the instructor-provided link or use a 12 digit event access code distributed by the instructor and access the Workshop Studio join url
 2. Sign in via the Workshop Studio, choose Email one-time password (OTP):
-   ![01-workshopotp](/static/images_prereq/01-workshopotp.png)
+ ![01-workshopotp](/static/images_prereq/01-workshopotp.png)
 
 3. Enter your email, receive a one-time email passcode, and sign in with it:
-   ![01-workshopotp-2email](/static/images_prereq/01-workshopotp-2email.png)
+ ![01-workshopotp-2email](/static/images_prereq/01-workshopotp-2email.png)
 
 4. Review the terms and conditions associated with this event, and then click Join event.
 5. After joining the event, you see the page with event information and workshop details. Choose Open AWS console:
@@ -33,7 +33,7 @@ Follow the instructions in this section to sign into a pre-provisioned workshop 
 If you are running this workshop in an AWS event, an AWS account will be provisioned for you.
 To get started, go to the AWS Console. Please check and make sure you are in the N. Virginia (us-east-1) region.
 
-## ✅ Start SageMaker AI Studio
+## Start SageMaker AI Studio
 
 After you signed into the workshop studio event AWS account you can move to the next step start [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) and execute setup notebook section.
 

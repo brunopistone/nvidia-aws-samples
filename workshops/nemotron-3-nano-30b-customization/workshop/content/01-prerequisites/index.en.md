@@ -1,5 +1,5 @@
 ---
-title : "⚙️ Prerequisites"
+title : " Prerequisites"
 weight : 10
 ---
 

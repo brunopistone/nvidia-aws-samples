@@ -1,9 +1,9 @@
 ---
-title: " 🧠 Sagemaker AI Studio"
+title: "Sagemaker AI Studio"
 weight: 13
 ---
 
-## 🏎️ Start SageMaker AI Studio
+## Start SageMaker AI Studio
 
 After signing into the AWS account, follow these instructions to open the SageMaker Studio environment.
 
@@ -49,13 +49,12 @@ cd nvidia-aws-samples/workshops/nemotron-3-nano-30b-customization/code
 
 You will run these notebooks in order:
 
-| Notebook                      | Module                                                 |
+| Notebook | Module |
 | ----------------------------- | ------------------------------------------------------ |
-| `1-prepare-data.ipynb`        | [Data Preparation](/02-lab-sft/01-data-preparation/)   |
-| `2-fine-tune-llm.ipynb`       | [Fine-Tuning](/02-lab-sft/02-fine-tuning/)             |
-| `3-evaluation.ipynb`          | [Evaluation](/02-lab-sft/03-evaluation/)               |
-| `4-deployment.ipynb`          | [SageMaker Inference](/03-lab-inference/01-sagemaker/) |
-| `4a-deployment-bedrock.ipynb` | [Bedrock Deployment](/03-lab-inference/02-bedrock/)    |
+| `1-prepare-data.ipynb` | [Data Preparation](/02-lab-sft/01-data-preparation/) |
+| `2-fine-tune-llm.ipynb` | [Fine-Tuning](/02-lab-sft/02-fine-tuning/) |
+| `3-evaluation.ipynb` | [Evaluation](/02-lab-sft/03-evaluation/) |
+| `4-deployment.ipynb` | [SageMaker Inference](/03-lab-inference/01-sagemaker/) |
 
 Select the **`Python 3 (ipykernel)`** kernel when a notebook asks, and run the first cell to install the dependencies from `requirements.txt`.
 

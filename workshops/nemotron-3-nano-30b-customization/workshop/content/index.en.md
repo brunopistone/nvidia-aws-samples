@@ -23,17 +23,17 @@ This is a structured reasoning task — the output is strict JSON with one entry
 - How to evaluate fine-tuned models with automated LLM-as-a-Judge metrics tailored to your use case
 - How to serve the customized model on a SageMaker real-time endpoint with vLLM
 
-::alert[**Important note** This workshop uses the **SFT** fine-tuning technique and walks through the full model customization lifecycle: data preparation, training, evaluation, and deployment. Each lab provides guided instructions so you can follow along step-by-step. The [Prerequisites](/01-prerequisites/) module is mandatory before running any other module.]{type="info"}
+::alert[**Important note** This workshop uses the **SFT** fine-tuning technique and walks through the full model customization lifecycle: data preparation, training, evaluation, and deployment. Each lab provides guided instructions so you can follow along step-by-step. The [Prerequisites](/00-prerequisites/) module is mandatory before running any other module.]{type="info"}
 
 ### Workshop modules
 
 | Module | ⏰ Duration | Level | Target Audience |
 |--------|----------|-------|-----------------|
-| 1. [Prerequisites](/01-prerequisites/) | 10-15 mins | Basic | All participants preparing setup and environment access |
-| 2. [Lab: Supervised Fine-Tuning (SFT)](/02-lab-sft/) | 50-60 mins | Advanced | Data scientists and AI practitioners |
-| 3. [Lab: Inference](/03-lab-inference/) | 40-50 mins | Advanced | ML engineers and data scientists |
-| 4. [Clean Up](/04-cleanup/) | 5-10 mins | Basic | All participants |
-| 5. [Summary](/05-summary/) | 5 mins | Basic | All participants |
+| 1. [Prerequisites](/00-prerequisites/) | 10-15 mins | Basic | All participants preparing setup and environment access |
+| 2. [Lab: Supervised Fine-Tuning (SFT)](/01-data-preparation/) | 50-60 mins | Advanced | Data scientists and AI practitioners |
+| 3. [Lab: Inference](/04-lab-inference/) | 40-50 mins | Advanced | ML engineers and data scientists |
+| 4. [Clean Up](/05-cleanup/) | 5-10 mins | Basic | All participants |
+| 5. [Summary](/06-summary/) | 5 mins | Basic | All participants |
 
 ### How to run the workshop
 

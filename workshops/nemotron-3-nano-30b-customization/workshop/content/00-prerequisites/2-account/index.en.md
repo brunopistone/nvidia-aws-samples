@@ -3,7 +3,7 @@ title: "Self paced AWS account"
 weight: 12
 ---
 
-::alert[Do not use these instructions if you're participating in an AWS-led workshop event — a workshop AWS account is already provisioned with the required configuration. Skip this page and move to [SageMaker AI Studio](/01-prerequisites/3-sagemaker/).]
+::alert[Do not use these instructions if you're participating in an AWS-led workshop event — a workshop AWS account is already provisioned with the required configuration. Skip this page and move to [SageMaker AI Studio](/00-prerequisites/3-sagemaker/).]
 
 The instructions on this page are for running the serverless model customization workshop in **your own AWS account**.
 
@@ -62,4 +62,4 @@ If you create the domain manually via the AWS Console, remember to attach `Amazo
 
 ## Start SageMaker AI Studio
 
-Once the account is set up, move on to [SageMaker AI Studio](/01-prerequisites/3-sagemaker/).
+Once the account is set up, move on to [SageMaker AI Studio](/00-prerequisites/3-sagemaker/).

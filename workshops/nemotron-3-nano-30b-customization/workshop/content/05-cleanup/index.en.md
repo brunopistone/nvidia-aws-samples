@@ -1,6 +1,6 @@
 ---
 title: "Clean Up"
-weight: 40
+weight: 50
 ---
 
 :::alert{header="Important" type="warning"}

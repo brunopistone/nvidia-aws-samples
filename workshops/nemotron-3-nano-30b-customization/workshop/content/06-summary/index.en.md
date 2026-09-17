@@ -1,6 +1,6 @@
 ---
 title: "Summary"
-weight: 50
+weight: 60
 ---
 
 In this workshop, you fine-tuned **NVIDIA Nemotron 3 Nano 30B-A3B** using Amazon SageMaker AI serverless model customization on the [ContractNLI](https://stanfordnlp.github.io/contract-nli/) contract review dataset. Starting from the pre-trained Nemotron Nano foundation model, you:
@@ -34,7 +34,7 @@ Your learning does not have to stop here. Bookmark these resources and use them 
 - Explore [Amazon SageMaker AI](https://aws.amazon.com/sagemaker/ai/) and dive deeper in the documentation.
 - Follow [What's new at AWS](https://aws.amazon.com/new/) for the latest launches.
 
-::alert[**Did you clean up?** Make sure you completed the [Clean Up](/04-cleanup/) module — a running endpoint keeps billing.]{type="warning"}
+::alert[**Did you clean up?** Make sure you completed the [Clean Up](/05-cleanup/) module — a running endpoint keeps billing.]{type="warning"}
 
 ::alert[**Congratulations** on completing the workshop. We appreciate and value your time and interest.]{type="success"}
 

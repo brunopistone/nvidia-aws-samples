@@ -1,6 +1,6 @@
 ---
 title: "Deployment"
-weight: 1
+weight: 40
 ---
 
 We are now ready to deploy the fine-tuned model to a SageMaker AI real-time endpoint.
@@ -52,5 +52,5 @@ Notebook 1 trains on `C.build_prompt`, a single string with the contract before 
 :::alert{header="Delete the endpoint when you're done" type="warning"}
 An endpoint bills per instance-hour for as long as it exists, whether or not you send traffic. An idle `ml.g5.xlarge` can cost more per day than the entire fine-tuning job.
 
-Run the cleanup cells at the bottom of the notebook, then visit the [Clean Up](/04-cleanup/) page to confirm everything is removed.
+Run the cleanup cells at the bottom of the notebook, then visit the [Clean Up](/05-cleanup/) page to confirm everything is removed.
 :::

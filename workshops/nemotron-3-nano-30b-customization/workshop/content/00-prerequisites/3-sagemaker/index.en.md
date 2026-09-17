@@ -51,11 +51,11 @@ You will run these notebooks in order:
 
 | Notebook | Module |
 | ----------------------------- | ------------------------------------------------------ |
-| `1-prepare-data.ipynb` | [Data Preparation](/02-lab-sft/01-data-preparation/) |
-| `2-fine-tune-llm.ipynb` | [Fine-Tuning](/02-lab-sft/02-fine-tuning/) |
-| `3-evaluation.ipynb` | [Evaluation](/02-lab-sft/03-evaluation/) |
-| `4-deployment.ipynb` | [SageMaker Inference](/03-lab-inference/01-sagemaker/) |
+| `1-prepare-data.ipynb` | [Data Preparation](/01-data-preparation/) |
+| `2-fine-tune-llm.ipynb` | [Fine-Tuning](/02-fine-tuning/) |
+| `3-evaluation.ipynb` | [Evaluation](/03-evaluation/) |
+| `4-deployment.ipynb` | [SageMaker Inference](/04-lab-inference/) |
 
 Select the **`Python 3 (ipykernel)`** kernel when a notebook asks, and run the first cell to install the dependencies from `requirements.txt`.
 
-::alert[**Ready!** SageMaker Studio is now configured and you are all set to dive into the labs, starting with [Supervised Fine-Tuning](/02-lab-sft/).]{type="success"}
+::alert[**Ready!** SageMaker Studio is now configured and you are all set to dive into the labs, starting with [Supervised Fine-Tuning](/01-data-preparation/).]{type="success"}

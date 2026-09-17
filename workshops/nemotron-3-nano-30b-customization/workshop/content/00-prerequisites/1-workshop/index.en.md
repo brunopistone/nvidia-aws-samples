@@ -35,6 +35,6 @@ To get started, go to the AWS Console. Please check and make sure you are in the
 
 ## Start SageMaker AI Studio
 
-After you signed into the workshop studio event AWS account you can move to the next step start [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) and execute setup notebook section.
+After you signed into the workshop studio event AWS account you can move to the next step start [SageMaker AI Studio](/00-prerequisites/3-sagemaker/) and execute setup notebook section.
 
-::alert[**Next lab** - After completion of this page move to [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) section. ]{type="success"}
+::alert[**Next lab** - After completion of this page move to [SageMaker AI Studio](/00-prerequisites/3-sagemaker/) section. ]{type="success"}

@@ -1,40 +1,42 @@
 ---
-title: "🏁 Getting started - Workshop Studio"
+title: "Getting started with Workshop Studio"
 weight: 11
 ---
 
-# 💻 Sign in to a Workshop Studio AWS Account
+## Use the instructor-provided environment
 
-If you participate in an AWS Immersion Day, AWS workshop, or a AWS instructor-led event you get access to a temporary AWS Account already pre-configured with Amazon SageMaker AI Studio and all required workshop resources.
+At an AWS instructor-led event, use the temporary AWS account and SageMaker AI Studio environment supplied by the instructor. Follow the steps below to join the event and access that account.
 
-Follow the instructions in this section to sign into a pre-provisioned workshop event AWS account and to start workshop Studio.
+If you are using your own AWS account instead, follow [Your own AWS account](/01-prerequisites/2-account/).
 
-## Before you start
+## Before joining
 
-- Log out from all AWS accounts from all browser windows
-- Review the terms and conditions of the event. Do not upload any personal or confidential information in the account
-- The AWS account is only be available for the duration of this workshop and you will not be able to retain access after the workshop is complete. Backup any materials you wish to keep access to after the workshop
-- Workshop deploys all pre-provisioned infrastructure to a specific region. Check what AWS Region is used
+- Have the event link or access code provided by your instructor ready.
+- Sign out of unrelated AWS console sessions or use a separate browser profile so you work in the intended account.
+- Review the event terms. Do not upload personal data, private contracts, credentials, or other confidential material into the temporary account.
+- Confirm the event's AWS Region. Pre-provisioned resources may not exist in another Region even if the console allows you to switch.
+- Know when temporary access ends and which non-sensitive workshop materials the instructor permits you to retain.
 
-## Workshop Studio AWS Account access
+## Join Workshop Studio
 
-1. Follow the instructor-provided link or use a 12 digit event access code distributed by the instructor and access the Workshop Studio join url
-2. Sign in via the Workshop Studio, choose Email one-time password (OTP):
-   ![01-workshopotp](/static/images_prereq/01-workshopotp.png)
+1. Open the instructor-provided event link, or use the event access code and join instructions supplied at the event.
+2. Sign in using the offered Workshop Studio sign-in method. When instructed to use email one-time password, select that option.
 
-3. Enter your email, receive a one-time email passcode, and sign in with it:
-   ![01-workshopotp-2email](/static/images_prereq/01-workshopotp-2email.png)
+![Workshop Studio one-time-password sign-in](/static/images_prereq/01-workshopotp.png)
 
-4. Review the terms and conditions associated with this event, and then click Join event.
-5. After joining the event, you see the page with event information and workshop details. Choose Open AWS console:
+3. Enter your email address, obtain the one-time passcode, and complete sign-in. Keep the passcode and event credentials private.
 
-![01-workshop-account](/static/images_prereq/01-workshop-account.png)
+![Enter the email address for the one-time passcode](/static/images_prereq/01-workshopotp-2email.png)
 
-If you are running this workshop in an AWS event, an AWS account will be provisioned for you.
-To get started, go to the AWS Console. Please check and make sure you are in the N. Virginia (us-east-1) region.
+4. Review the event terms and choose **Join event**.
+5. On the event information page, choose **Open AWS console**.
 
-## ✅ Start SageMaker AI Studio
+![Open the event AWS console](/static/images_prereq/01-workshop-account.png)
 
-After you signed into the workshop studio event AWS account you can move to the next step start [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) and execute setup notebook section.
+After the console opens, compare the account and Region with the instructor's instructions. If the event link has expired, the account is unavailable, or the expected resources are missing, ask the instructor for help rather than creating substitute infrastructure in a personal account.
 
-::alert[**Next lab** - After completion of this page move to [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) section. ]{type="success"}
+## Next step
+
+Continue to [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) to open the supplied profile and JupyterLab space. Event participants do not need to complete the own-account setup unless directed by the instructor.
+
+:button[Open Studio setup instructions]{href="/01-prerequisites/3-sagemaker/"}

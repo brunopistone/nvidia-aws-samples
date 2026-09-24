@@ -4,53 +4,78 @@ Description: >
   Enhanced CloudFormation stack for Amazon SageMaker with dynamic multi-region support. Creates VPC with dynamic subnet allocation across multiple AZs, VPC endpoints, and SageMaker Studio Domain.
 
 Mappings:
+  # Distribution image accounts, not the Studio Classic kernel image accounts:
+  # https://docs.aws.amazon.com/sagemaker/latest/dg/notebooks-available-images.html
   RegionMap:
     us-east-1:
       AZCount: 6
+      DistributionImageAccount: "885854791233"
     us-east-2:
       AZCount: 3
+      DistributionImageAccount: "137914896644"
     us-west-1:
       AZCount: 2
+      DistributionImageAccount: "053634841547"
     us-west-2:
       AZCount: 3
+      DistributionImageAccount: "542918446943"
     af-south-1:
       AZCount: 3
+      DistributionImageAccount: "238384257742"
     ap-east-1:
       AZCount: 3
+      DistributionImageAccount: "523751269255"
     ap-south-1:
       AZCount: 3
+      DistributionImageAccount: "245090515133"
     ap-northeast-2:
       AZCount: 4
+      DistributionImageAccount: "064688005998"
     ap-southeast-1:
       AZCount: 3
+      DistributionImageAccount: "022667117163"
     ap-southeast-2:
       AZCount: 3
+      DistributionImageAccount: "648430277019"
     ap-northeast-1:
       AZCount: 3
+      DistributionImageAccount: "010972774902"
     ca-central-1:
       AZCount: 3
+      DistributionImageAccount: "481561238223"
     eu-central-1:
       AZCount: 3
+      DistributionImageAccount: "545423591354"
     eu-west-1:
       AZCount: 3
+      DistributionImageAccount: "819792524951"
     eu-west-2:
       AZCount: 3
+      DistributionImageAccount: "021081402939"
     eu-west-3:
       AZCount: 3
+      DistributionImageAccount: "856416204555"
     eu-north-1:
       AZCount: 3
+      DistributionImageAccount: "175620155138"
     eu-south-1:
       AZCount: 3
+      DistributionImageAccount: "810671768855"
     sa-east-1:
       AZCount: 3
+      DistributionImageAccount: "567556641782"
     ap-northeast-3:
       AZCount: 3
+      DistributionImageAccount: "564864627153"
     ap-southeast-3:
       AZCount: 3
+      DistributionImageAccount: "370607712162"
     me-south-1:
       AZCount: 3
+      DistributionImageAccount: "523774347010"
     me-central-1:
       AZCount: 3
+      DistributionImageAccount: "358593528301"
 
 Parameters:
   VpcCidr:
@@ -72,6 +97,20 @@ Parameters:
     Type: String
     Description: Instance type for JupyterLab space
     Default: ml.m5.large
+
+  WorkshopLifecycleRevision:
+    Type: String
+    Default: v2
+    AllowedPattern: "[A-Za-z0-9-]+"
+    MaxLength: 16
+    Description: Change this revision when updating the lifecycle script or repository ref; SageMaker lifecycle configs are immutable.
+
+  WorkshopRepositoryRef:
+    Type: String
+    Default: main
+    AllowedPattern: "[A-Za-z0-9][A-Za-z0-9._/-]*"
+    MaxLength: 128
+    Description: Branch or tag in the canonical aws-samples repository for first checkout only; existing work is never updated.
 
   JupyterLabStorageSize:
     Type: Number
@@ -717,6 +756,67 @@ Resources:
       AliasName: !Sub "alias/${AWS::StackName}-sagemaker"
       TargetKeyId: !Ref SageMakerKMSKey
 
+  # Run as the notebook user so new files belong to the participant, not root.
+  JupyterLabLifecycleConfig:
+    Type: AWS::SageMaker::StudioLifecycleConfig
+    Properties:
+      StudioLifecycleConfigAppType: JupyterLab
+      # A stack UUID avoids name-length/collision issues; revision permits replacement.
+      StudioLifecycleConfigName: !Sub
+        - "workshop-${StackUuid}-${WorkshopLifecycleRevision}"
+        - StackUuid: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+      StudioLifecycleConfigContent: !Base64
+        Fn::Sub: |
+          #!/bin/bash
+          set -euo pipefail
+          sudo -u sagemaker-user -H bash <<'WORKSHOP'
+          set -euo pipefail
+          TARGET=/home/sagemaker-user/generative-ai-on-amazon-sagemaker
+          SUBTREE=workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai
+          REF='${WorkshopRepositoryRef}'
+          # A lock also protects against concurrent manual/bootstrap invocations.
+          exec 9>/home/sagemaker-user/.workshop-checkout.lock
+          flock -w 10 9
+          if [ -e "$TARGET" ] || [ -L "$TARGET" ]; then
+            echo "Preserving existing $TARGET; no pull, reset or dependency installation."
+          else
+            # Stage on persistent storage. A failed checkout never occupies TARGET.
+            STAGING=$(mktemp -d /home/sagemaker-user/.workshop-checkout.XXXXXX)
+            if timeout --kill-after=10s 240s env GIT_TERMINAL_PROMPT=0 bash -s -- "$REF" "$STAGING/repository" "$SUBTREE" <<'SPARSE'
+          set -euo pipefail
+          REF=$1
+          REPOSITORY=$2
+          SUBTREE=$3
+          git clone --depth 1 --filter=blob:none --no-checkout --branch "$REF" \
+            https://github.com/aws-samples/generative-ai-on-amazon-sagemaker.git "$REPOSITORY"
+          if [ "$(git -C "$REPOSITORY" cat-file -t "HEAD:$SUBTREE")" != tree ]; then
+            echo "ERROR: $SUBTREE is not a directory at branch/tag $REF. Confirm publication with your instructor."
+            exit 1
+          fi
+          # Non-cone mode excludes root and sibling files; retain .git for provenance.
+          git -C "$REPOSITORY" sparse-checkout set --no-cone "/$SUBTREE/"
+          # HEAD is the commit selected by clone, including when REF names a tag.
+          git -C "$REPOSITORY" checkout --detach HEAD
+          if [ ! -d "$REPOSITORY/$SUBTREE/01-serverless-workshop" ] || [ ! -d "$REPOSITORY/$SUBTREE/02-smtj-workshop" ]; then
+            echo "ERROR: Expected workshop tracks missing at branch/tag $REF; checkout not installed."
+            exit 1
+          fi
+          SPARSE
+            then
+              # -T/-n refuse to merge into or overwrite a destination created meanwhile.
+              mv -T -n "$STAGING/repository" "$TARGET"
+            else
+              echo "WARNING: Sparse checkout failed or timed out. Staging retained at $STAGING; use the manual checkout instructions."
+            fi
+          fi
+          ROOT="$TARGET/$SUBTREE"
+          if [ -d "$ROOT/01-serverless-workshop" ] && [ -d "$ROOT/02-smtj-workshop" ]; then
+            echo "Workshop source available at $ROOT"
+          else
+            echo "WARNING: Expected workshop tracks missing. Confirm the published branch/tag with your instructor."
+          fi
+          WORKSHOP
+
   # IAM Role
   SageMakerExecutionRole:
     Type: AWS::IAM::Role
@@ -829,6 +929,12 @@ Resources:
       - VPCEndpointSageMakerRuntime
       - VPCEndpointSTS
       - S3Endpoint
+      # VpcOnly startup clones from public GitHub through the existing NAT.
+      - PublicRoute
+      - PublicSubnetAZ1RouteTableAssociation
+      - PrivateRoute
+      - PrivateSubnetAZ1RouteTableAssociation
+      - PrivateSubnetAZ2RouteTableAssociation
     Properties:
       DomainName: !Ref SageMakerStudioDomainName
       AppNetworkAccessType: VpcOnly
@@ -846,6 +952,9 @@ Resources:
         ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
         SecurityGroups:
           - !Ref SageMakerInstanceSecurityGroup
+        JupyterLabAppSettings:
+          LifecycleConfigArns:
+            - !GetAtt JupyterLabLifecycleConfig.StudioLifecycleConfigArn
       DefaultSpaceSettings:
         ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
 
@@ -876,7 +985,16 @@ Resources:
         JupyterLabAppSettings:
           DefaultResourceSpec:
             InstanceType: !Ref JupyterLabInstanceType
-            # redundant since default provided in domain
+            LifecycleConfigArn: !GetAtt JupyterLabLifecycleConfig.StudioLifecycleConfigArn
+            SageMakerImageArn: !Sub
+              - "arn:${AWS::Partition}:sagemaker:${AWS::Region}:${ImageAccount}:image/sagemaker-distribution-cpu"
+              - ImageAccount:
+                  !FindInMap [
+                    RegionMap,
+                    !Ref "AWS::Region",
+                    DistributionImageAccount,
+                  ]
+            # CFN Space ResourceSpec has no version alias field; CreateApp pins 4.5.0 below.
         SpaceStorageSettings:
           EbsStorageSettings:
             EbsVolumeSizeInGb: !Ref JupyterLabStorageSize
@@ -903,8 +1021,14 @@ Resources:
               - Effect: Allow
                 Action:
                   - "sagemaker:CreateApp"
-                Resource: "*"
+                  - "sagemaker:DescribeApp"
+                  - "sagemaker:DeleteApp"
+                  - "sagemaker:AddTags"
+                # Include old domain/space identities during CFN replacement cleanup.
+                Resource: !Sub "arn:${AWS::Partition}:sagemaker:${AWS::Region}:${AWS::AccountId}:app/*/*-jupyterlab-space/JupyterLab/default"
 
+  # Native CFN App does not support space-based JupyterLab or image version aliases.
+  # Bound polling below the Lambda timeout and reserve time to respond to CFN.
   # Lambda function to start the JupyterLab space
   StartSpaceLambdaFunction:
     Type: AWS::Lambda::Function
@@ -913,33 +1037,114 @@ Resources:
       Runtime: python3.12
       Handler: index.handler
       Role: !GetAtt StartSpaceLambdaRole.Arn
-      Timeout: 60
+      Timeout: 900
       Code:
         ZipFile: |
+          import json
+          import time
+          import traceback
+          import urllib.request
           import boto3
-          import cfnresponse
+          from botocore.config import Config
+          from botocore.exceptions import ClientError
+
+          def respond(event, context, status, physical_id, data, reason):
+              body = json.dumps({
+                  'Status': status, 'Reason': reason[:1000],
+                  'PhysicalResourceId': physical_id,
+                  'StackId': event['StackId'], 'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'], 'Data': data,
+              }).encode('utf-8')
+              request = urllib.request.Request(
+                  event['ResponseURL'], data=body, method='PUT',
+                  headers={'content-type': '', 'content-length': str(len(body))})
+              # Never log the presigned response URL. Each attempt is bounded.
+              for attempt in range(3):
+                  try:
+                      with urllib.request.urlopen(request, timeout=10) as response:
+                          response.read()
+                      return
+                  except Exception:
+                      if attempt == 2:
+                          raise
+                      time.sleep(1)
+
+          def describe(client, identity):
+              try:
+                  return client.describe_app(**identity)
+              except ClientError as error:
+                  if error.response['Error']['Code'] == 'ResourceNotFound':
+                      return {'Status': 'Deleted'}
+                  raise
+
+          def reconcile(client, identity, spec, deleting, deadline):
+              while time.monotonic() < deadline:
+                  app = describe(client, identity)
+                  state = app['Status']
+                  if deleting:
+                      if state == 'Deleted':
+                          return {'Status': 'Deleted'}
+                      if state != 'Deleting':
+                          try:
+                              client.delete_app(**identity)
+                          except ClientError as error:
+                              # Pending apps can briefly reject deletion; retry only in-use.
+                              if error.response['Error']['Code'] not in ('ResourceInUse', 'ResourceNotFound'):
+                                  raise
+                  else:
+                      if state == 'Deleted':
+                          try:
+                              client.create_app(**identity, ResourceSpec=spec)
+                          except ClientError as error:
+                              if error.response['Error']['Code'] != 'ResourceInUse':
+                                  raise
+                      elif state == 'Failed':
+                          raise RuntimeError('JupyterLab failed: ' + app.get('FailureReason', 'unknown reason'))
+                      elif state == 'InService':
+                          # Never interrupt a participant's running app on stack updates.
+                          actual = app.get('ResourceSpec', {})
+                          # DescribeApp may return a resolved version ARN instead of the alias.
+                          mismatches = [key for key, value in spec.items()
+                                        if (key != 'SageMakerImageVersionAlias' or key in actual)
+                                        and actual.get(key) != value]
+                          if mismatches:
+                              raise RuntimeError('Save work and stop the existing app before updating: ' + ', '.join(mismatches))
+                          return {'Status': state, 'AppArn': app['AppArn']}
+                  time.sleep(10)
+              raise TimeoutError('Timed out waiting for JupyterLab ' +
+                                 ('deletion; stop the app and retry stack deletion.' if deleting else
+                                  'InService; inspect Studio status and lifecycle logs.'))
 
           def handler(event, context):
+              physical_id = event.get('PhysicalResourceId', event['LogicalResourceId'])
+              status, data, reason = 'FAILED', {}, 'Unexpected startup failure'
               try:
-                  if event['RequestType'] != 'Create':
-                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-                      return
-
-                  boto3.client('sagemaker').create_app(
-                      DomainId=event['ResourceProperties']['DomainId'],
-                      SpaceName=event['ResourceProperties']['SpaceName'],
-                      AppType='JupyterLab',
-                      AppName='default',
-                      ResourceSpec={
-                          'InstanceType': event['ResourceProperties']['InstanceType'],
-                          'SageMakerImageArn': 'arn:aws:sagemaker:us-east-1:885854791233:image/sagemaker-distribution-cpu',
-                          'SageMakerImageVersionAlias': '3.6.1'
-                      }
-                  )
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as e:
-                  print(e)
-                  cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)})
+                  props = event['ResourceProperties']
+                  identity = {key: props[key] for key in ('DomainId', 'SpaceName')}
+                  identity.update(AppType='JupyterLab', AppName='default')
+                  request_type = event['RequestType']
+                  old = event.get('OldResourceProperties', props)
+                  if request_type != 'Delete' and (
+                      'PhysicalResourceId' not in event or
+                      any(old.get(key) != props[key] for key in ('DomainId', 'SpaceName'))
+                  ):
+                      physical_id = '/'.join(identity.values())
+                  if request_type not in ('Create', 'Update', 'Delete'):
+                      raise ValueError('Unsupported request type: ' + request_type)
+                  deleting = request_type == 'Delete'
+                  spec = {} if deleting else {key: props[key] for key in (
+                      'InstanceType', 'LifecycleConfigArn', 'SageMakerImageArn',
+                      'SageMakerImageVersionAlias')}
+                  client = boto3.client('sagemaker', config=Config(
+                      connect_timeout=5, read_timeout=10,
+                      retries={'mode': 'standard', 'total_max_attempts': 2}))
+                  deadline = time.monotonic() + min(780, context.get_remaining_time_in_millis() / 1000 - 90)
+                  data = reconcile(client, identity, spec, deleting, deadline)
+                  status, reason = 'SUCCESS', 'Observed JupyterLab status: ' + data['Status']
+              except Exception as error:
+                  traceback.print_exc()
+                  reason = str(error)
+              respond(event, context, status, physical_id, data, reason)
 
   # Custom resource to trigger the Lambda function
   StartJupyterLabSpace:
@@ -947,9 +1152,40 @@ Resources:
     DependsOn: JupyterLabSpace
     Properties:
       ServiceToken: !GetAtt StartSpaceLambdaFunction.Arn
+      ServiceTimeout: 930
+      # Conditional Refs add dependencies only for subnets present in this region.
+      PrivateRouteAssociations:
+        - !Ref PrivateSubnetAZ1RouteTableAssociation
+        - !Ref PrivateSubnetAZ2RouteTableAssociation
+        - !If [
+            HasThreeOrMoreAZs,
+            !Ref PrivateSubnetAZ3RouteTableAssociation,
+            !Ref AWS::NoValue,
+          ]
+        - !If [
+            HasFourOrMoreAZs,
+            !Ref PrivateSubnetAZ4RouteTableAssociation,
+            !Ref AWS::NoValue,
+          ]
+        - !If [
+            HasFiveOrMoreAZs,
+            !Ref PrivateSubnetAZ5RouteTableAssociation,
+            !Ref AWS::NoValue,
+          ]
+        - !If [
+            HasSixOrMoreAZs,
+            !Ref PrivateSubnetAZ6RouteTableAssociation,
+            !Ref AWS::NoValue,
+          ]
       DomainId: !Ref StudioDomain
       SpaceName: !Sub "${SageMakerStudioDefaultUserName}-jupyterlab-space"
       InstanceType: !Ref JupyterLabInstanceType
+      LifecycleConfigArn: !GetAtt JupyterLabLifecycleConfig.StudioLifecycleConfigArn
+      SageMakerImageArn: !Sub
+        - "arn:${AWS::Partition}:sagemaker:${AWS::Region}:${ImageAccount}:image/sagemaker-distribution-cpu"
+        - ImageAccount:
+            !FindInMap [RegionMap, !Ref "AWS::Region", DistributionImageAccount]
+      SageMakerImageVersionAlias: "4.5.0"
 
 Outputs:
   VpcId:

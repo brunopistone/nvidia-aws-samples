@@ -34,7 +34,7 @@ DATA_PREFIX = f"datasets/{DATASET_PREFIX}"
 # `<TRAIN_JOB_PREFIX>-<timestamp>` and its artifacts land under
 # `s3://<bucket>/[<prefix>/]<TRAIN_JOB_PREFIX>/<full-job-name>/output/model.tar.gz`.
 #
-# Derived once, here, because notebook 2 uses it as `base_job_name` and notebook 4 uses it
+# Derived once, here, because notebook 2 uses it as `base_job_name` and notebook 3 uses it
 # to find the last completed job. In the reference workshop this interpolation is written
 # out in both notebooks, so editing one and not the other silently deploys the wrong run.
 TRAIN_JOB_PREFIX = f"train-{MODEL_SLUG}-sft"

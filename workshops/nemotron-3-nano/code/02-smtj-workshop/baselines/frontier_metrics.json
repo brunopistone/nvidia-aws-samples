@@ -1,0 +1,11 @@
+{
+ "label_correct": 84.08,
+ "evidence_f1": 68.63,
+ "contradiction_correct": 62.26,
+ "json_valid": 100.0,
+ "records": 123,
+ "model": "global.anthropic.claude-sonnet-5",
+ "prompt": "plain messages (no chat template)",
+ "temperature": "not settable on this model",
+ "runtime_min": 2.2
+}

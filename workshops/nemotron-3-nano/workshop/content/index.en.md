@@ -1,64 +1,80 @@
 ---
-title: "Fine-tune NVIDIA Nemotron 3 model on Amazon SageMaker AI serverless Model Customization"
+title: "Fine-tune NVIDIA Nemotron 3 models on Amazon SageMaker AI"
 weight: 0
 ---
 
-Welcome to the **Fine-tune NVIDIA Nemotron 3 model on Amazon SageMaker AI serverless Model Customization** workshop!
+## Build a contract-review assistant that cites its evidence
 
-In this hands-on workshop, you'll experience how Amazon SageMaker AI serverless model customization changes the way developers fine-tune foundation models. Starting from the pre-trained **NVIDIA Nemotron 3 Nano 30B-A3B** model, you will prepare a dataset, run a Supervised Fine-Tuning (SFT) job with LoRA, evaluate the improvements, and deploy the customized model for inference — all without provisioning or managing any training infrastructure.
+This workshop teaches supervised fine-tuning of NVIDIA Nemotron 3 models through two alternative Amazon SageMaker AI workflows. Both use ContractNLI: a model reads a non-disclosure agreement, applies a fixed checklist of 17 legal hypotheses, and returns a verdict plus numbered evidence spans for every item. You will follow the data, configuration, model artifact, and evaluation results through their actual service boundaries.
 
-Working directly in SageMaker AI Studio JupyterLab, you'll take an open-weight NVIDIA Nemotron 3 model through the complete customization lifecycle: data preparation, serverless fine-tuning, evaluation, and deployment.
+The goal is not simply to obtain fluent text or valid JSON. A reviewer needs a correct decision and an inspectable citation. A model that claims a protection exists when the agreement is silent can be more harmful than one that openly returns an incomplete answer. This educational workflow requires human legal review and is not a substitute for legal advice.
 
-## 🎯 The task
+## Learning objectives
 
-You will teach the model a strict, easily verifiable behaviour using the [Multilingual-Thinking](https://huggingface.co/datasets/HuggingFaceH4/Multilingual-Thinking) dataset: **reason inside `<think>...</think>` tags in a target non-English language** (Spanish, French, Italian or German, selected via the system prompt), then **give the final answer in English**.
+By the end of your selected track, you should be able to:
 
-## 📚 What You'll Learn
+- Transform document-level annotations into the exact supervised record schema consumed by the selected training interface.
+- Explain how Low-Rank Adaptation changes a model and why precision, adapter targets, token budgets, and loss boundaries matter.
+- Distinguish a SageMaker serverless customization recipe from a Training job running your own TRL script.
+- Trace a model from its training input and configuration to either a registry package or a direct S3 artifact.
+- Explain the actual deployment resource order and verify the request, output schema, and artifact identity.
+- Interpret verdict accuracy, citation F1, schema compliance, and judge coverage without treating a smoke test as a benchmark.
+- Identify and clean up independently billed training, evaluation, hosting, Studio, and retained storage resources.
 
-- How to use SageMaker AI serverless Model Customization to fine-tune foundation models
-- How to customize NVIDIA Nemotron 3 models without any infrastructure provisioning or management
-- How to apply Supervised Fine-Tuning (SFT) with LoRA to a selected NVIDIA Nemotron 3 model
-- How to evaluate fine-tuned models with automated LLM-as-a-Judge metrics tailored to your use case
-- How to serve the customized model on a SageMaker real-time endpoint with vLLM
+Track 1 implements managed evaluation of registered base/tuned models. Track 2 implements training, direct deployment, held-out endpoint prediction collection with local scoring, and optional Bedrock judging of precomputed responses. Track 2's evaluation switches default to shipped reference results, so running its analysis without enabling live evaluation does not measure your deployed model. Both evaluation lessons distinguish implemented behavior from remaining metric, provenance, and judge limitations.
 
-::alert[**Important note** This workshop uses the **SFT** fine-tuning technique and walks through the full model customization lifecycle: data preparation, training, evaluation, and deployment. Each lab provides guided instructions so you can follow along step-by-step. The [Prerequisites](/01-prerequisites/) module is mandatory before running any other module.]{type="info"}
+## Understand the output contract
 
-### 🎓 Workshop modules
+Each checklist key maps to a verdict and an evidence list:
 
-| Module | ⏰ Duration | 🔥 Level | 👥 Target Audience |
-|--------|----------|-------|-----------------|
-| 1. [Prerequisites](/01-prerequisites/) | 10-15 mins | Basic | All participants preparing setup and environment access |
-| 2. [Lab: Supervised Fine-Tuning (SFT)](/02-lab-sft/) | 50-60 mins | Advanced | Data scientists and AI practitioners |
-| 3. [Lab: Inference](/03-lab-inference/) | 40-50 mins | Advanced | ML engineers and data scientists |
-| 4. [Clean Up](/04-cleanup/) | 5-10 mins | Basic | All participants |
-| 5. [Summary](/05-summary/) | 5 mins | Basic | All participants |
+| Label           | Meaning                                    | Evidence                            |
+| --------------- | ------------------------------------------ | ----------------------------------- |
+| `Entailment`    | The contract supports the hypothesis       | Supporting clause/span identifiers  |
+| `Contradiction` | The contract conflicts with the hypothesis | Conflicting clause/span identifiers |
+| `NotMentioned`  | The contract does not address it           | Empty list                          |
 
-### 🔢 How to run the workshop
+For example, the notebook's annotated Navidec contract prohibits disclosure without prior written permission in span `[3]`. The dataset labels employee sharing (`nda-5`) as `Contradiction` with evidence `[3]`. That is a dataset annotation to inspect, not a model result. One clause can justify several checklist decisions, and an exception elsewhere in the contract can change the interpretation.
 
-This workshop follows a hands-on, self-paced format. Each module walks through Jupyter notebooks that you run in your own JupyterLab environment (setup instructions are in the prerequisites section). The notebooks include:
+The full target contains all 17 original keys, which are not consecutively numbered. ContractNLI's document-level split is 423 training, 61 development, and 123 test contracts. Keeping entire documents in one split prevents training on one part of an NDA and testing on another. The test set's 2,091 decisions share 123 documents, so they should not be treated as 2,091 independent contracts.
 
-- Step-by-step instructions and explanations
-- Code samples that you can run and modify
-- Links to additional resources
+## Choose one track
 
-### 🔗 Workshop GitHub repository
+| Dimension          | [Track 1: Serverless customization](/02-serverless/)  | [Track 2: Training jobs](/03-training-jobs/)                                  |
+| ------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Model              | Nemotron 3 Nano 30B-A3B BF16                          | Nemotron 3 Nano 4B BF16                                                       |
+| Model identifier   | JumpStart ID from `config.py`                         | Hugging Face ID from `config.py`                                              |
+| Training interface | SageMaker `SFTTrainer`, managed LoRA recipe           | `ModelTrainer` running TRL `SFTTrainer` and PEFT                              |
+| Input shape        | String `prompt`/`completion`; test `query`/`response` | Conversational `prompt`/`completion` with template options                    |
+| Input handoff      | AI Registry datasets                                  | S3 `train`, `val`, and `config` channels                                      |
+| Training output    | Model Package with merged checkpoint prefix           | Merged checkpoint/tokenizer in S3 `model.tar.gz`                              |
+| Hosting            | Four-GPU inference component on one `ml.g5.12xlarge`  | Direct production variant on one `ml.g5.xlarge`                               |
+| Quality evaluation | Managed custom scorer and LLM judge                   | Endpoint predictions with local scoring; optional Bedrock judge; shipped references by default |
 
-The workshop notebooks are available in the public [nvidia-aws-samples](https://github.com/NVIDIA/nvidia-aws-samples) GitHub repository, under `workshops/nemotron-3-nano-30b-customization/code/`.
+Choose Track 1 to focus on managed recipe configuration, registry lineage, and managed evaluation. Choose Track 2 to inspect training internals, inline YAML, dependencies, model export, and direct serving. The current Training-job recipe uses one `ml.g5.2xlarge`, one epoch, BF16 LoRA rather than QLoRA, and an optional-by-configuration retained warm pool.
 
-We welcome you to bookmark and star the repository for access to future content we publish.
+These tracks are alternatives, not consecutive labs and not a controlled comparison of model sizes. They differ in model, prompt representation, training recipe, and evaluation implementation. An active-parameter designation describes model computation, not proof of superior task quality or the complete storage requirement for its weights.
 
-### Disclaimers
+::alert[**Use one track per setup.** Both configurations default to `datasets/contractnli-nda-review` in the session bucket, including the same train and validation object keys. Their schemas differ. Running one track's upload cells over the other can invalidate a registered dataset without changing its name. Separate notebook folders do not isolate S3; isolate bucket/prefix and resource naming consistently before attempting both.]{type="warning"}
 
-::alert[All code is covered under the [MIT-0 license](https://github.com/aws/mit-0)]
-::alert[Please remember to clean up all resources created during this workshop to avoid ongoing charges to your AWS account.]
+## How to use the workshop
 
-### Security Best Practices
+The notebooks and helpers live in [aws-samples/generative-ai-on-amazon-sagemaker](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/tree/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai). Open them in a SageMaker AI Studio JupyterLab space and execute the selected track from its own directory. The pages explain the transformations, annotated code, checks, and failure modes; the linked notebooks remain the execution source.
 
-Throughout this workshop, we adhere to AWS service security best practices. We encourage you to familiarize yourself with the [AWS Security Best Practices](https://aws.amazon.com/architecture/security-identity-compliance/) and apply them in your own implementations. Key points include:
+| Stage                               | What to retain before proceeding                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| [Prerequisites](/01-prerequisites/) | Account, Region, role, chosen track, and quota/access checks                           |
+| Data preparation                    | Exact schema, split counts, input locations, and prompt/template configuration         |
+| Training                            | Job identity, resolved configuration, and package/artifact identity                    |
+| Evaluation                          | Actual prediction/reference pairs, scorer definition, execution identity, and coverage |
+| Deployment                          | Model, EndpointConfig, Endpoint, and component name where applicable                   |
+| [Clean Up](/04-cleanup/)            | Confirmation that unwanted compute and resources are no longer active                  |
 
-- Using IAM roles and policies with least privilege
-- Encrypting data at rest and in transit
-- Implementing network security controls
-- Regularly monitoring and auditing your resources
+Track 2's notebook execution order is `1-prepare-data.ipynb`, `2-fine-tune-llm.ipynb`, `3-deployment.ipynb`, then `4-evaluation.ipynb`. Keep the endpoint running for fresh prediction collection, not merely for reading references or judging saved answers. Hosting cleanup is at the end of notebook 4 and runs independently of the evaluation switches, so do not use Run All without reviewing that final cell. Some source Markdown still describes older multi-GPU settings or historical results; these pages use the executable configuration and distinguish reference results from your own measurements.
 
-Remember to always follow security best practices when working with AWS services and sensitive data.
+## Cost, security, and evidence
+
+Training, evaluation inference, Bedrock judging, endpoint hosting, Studio compute, warm pools, and storage are separate cost categories. Serverless **training** does not make the real-time **endpoint** serverless. Stopping a kernel does not stop a remote job, and a local timeout does not delete an endpoint. No fixed runtime, cost reduction, or quality improvement is promised.
+
+Use approved data and a dedicated workshop environment. Review ContractNLI and model licenses before use; never upload confidential contracts or credentials to a temporary event account. Apply IAM permissions to the actual resources and distinguish role trust from permission to invoke a service. Preserve the data/configuration/artifact lineage so that results can be audited rather than inferred from a familiar resource name.
+
+:button[Start prerequisites]{href="/01-prerequisites/"}

@@ -26,10 +26,19 @@ infrastructure:
       participantAllStackOutputsVisible: true
   requiredResources:
     sagemaker:
+      # Also verify quota for one ml.m5.large JupyterLab app in the event region.
+      # Do not substitute training/endpoint quotas for this separate Studio quota.
+      # Alternative tracks: participants run one track per isolated setup.
+      # Track 1: serverless customization with inference-component hosting.
       - type: endpoint/ml.g5.12xlarge
         quantity: 1
+      # Track 2: ModelTrainer training and direct endpoint hosting.
+      - type: training-job/ml.g5.2xlarge
+        quantity: 1
+      - type: endpoint/ml.g5.xlarge
+        quantity: 1
 params:
-  author: Bruno Pistone, Nicolas Jourdan, Christian Kamwangala, Hossam Basudan
-  description: Serverless Model Customization on SageMaker AI
-  emailContact: bpistone@amazon.com, basudan@amazon.ae, kamwang@amazon.fr, njourdan@amazon.de
+  author: Bruno Pistone, Nicolas Jourdan, Sandeep Raveesh-Babu
+  description: Fine-tune NVIDIA Nemotron 3 models on Amazon SageMaker AI using Serverless model customization or SageMaker Training jobs
+  emailContact: bpistone@amazon.it, njourdan@amazon.de, sanravee@amazon.com
 version: 2.0

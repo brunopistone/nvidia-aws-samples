@@ -15,10 +15,12 @@ awsAccountConfig:
       recommended:
         - us-east-1
         - us-west-2
+        - us-east-2
     deployableRegions:
       recommended:
         - us-east-1
         - us-west-2
+        - us-east-2
 infrastructure:
   cloudformationTemplates:
     - templateLocation: static/cfn/workshop-setup.yaml
@@ -33,9 +35,35 @@ infrastructure:
       - type: endpoint/ml.g5.12xlarge
         quantity: 1
       # Track 2: ModelTrainer training and direct endpoint hosting.
+      - type: training-job/ml.g5.xlarge
+        quantity: 1
       - type: training-job/ml.g5.2xlarge
         quantity: 1
+      - type: training-job/ml.g6.xlarge
+        quantity: 1
+      - type: training-job/ml.g6.2xlarge
+        quantity: 1
+      - type: training-job/ml.g7.2xlarge
+        quantity: 1
+      - type: training-job/ml.g7.4xlarge
+        quantity: 1
       - type: endpoint/ml.g5.xlarge
+        quantity: 1
+      - type: endpoint/ml.g6.xlarge
+        quantity: 1
+      - type: endpoint/ml.g6.2xlarge
+        quantity: 1
+      - type: endpoint/ml.g7.2xlarge
+        quantity: 1
+      - type: endpoint/ml.g7.4xlarge
+        quantity: 1
+      - type: endpoint/ml.g6e.xlarge
+        quantity: 1
+      - type: endpoint/ml.g6e.2xlarge
+        quantity: 1
+      - type: endpoint/ml.g6e.4xlarge
+        quantity: 1
+      - type: endpoint/ml.g6e.8xlarge
         quantity: 1
 params:
   author: Bruno Pistone, Nicolas Jourdan, Sandeep Raveesh-Babu

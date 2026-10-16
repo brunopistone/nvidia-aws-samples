@@ -7,11 +7,11 @@ weight: 2
 
 You will configure the SageMaker serverless `SFTTrainer`, connect registered datasets to a Model Package Group, interpret the LoRA and optimization settings, submit an asynchronous customization job, and verify the resulting model lineage. The objective is to adapt contract decisions and citations, not merely to make training loss decrease.
 
-::alert[Open [01-serverless-workshop/2-fine-tune-llm.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/01-serverless-workshop/2-fine-tune-llm.ipynb) after [data preparation](/02-serverless/01-data-preparation/). This notebook's SageMaker `SFTTrainer` is different from the TRL class with the same name used inside Track 2.]{type="info"}
+::alert[Open [01-serverless-workshop/2-fine-tune-llm.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/01-serverless-workshop/2-fine-tune-llm.ipynb) after [data preparation](/02-serverless/01-data-preparation/). This notebook's SageMaker `SFTTrainer` is different from the TRL class with the same name used inside the 4B Training jobs journey.]{type="info"}
 
 ## LoRA: what changes and what stays frozen
 
-For a weight matrix \(W\) with shape \(d*{out} \times d*{in}\), ordinary LoRA represents an update using two smaller matrices: \(W' = W + (\alpha/r)BA\), with \(A\) shaped \(r \times d*{in}\) and \(B\) shaped \(d*{out} \times r\). The base matrix remains frozen during adapter training. The trainable update has \(r(d*{in}+d*{out})\) parameters instead of \(d*{in}d*{out}\) for a full matrix update.
+For a weight matrix `W` with shape `output_dim * input_dim`, ordinary LoRA represents an update using two smaller matrices: `W_updated = W + (alpha / rank) * B * A`, with `A` shaped `rank * input_dim` and `B` shaped `output_dim * rank`. The base matrix remains frozen during adapter training. The trainable update has `rank * (input_dim + output_dim)` parameters instead of `input_dim * output_dim` for a full matrix update.
 
 ![LoRA architecture](/static/images/lab-1-sft/lora_animated.gif)
 
@@ -36,7 +36,7 @@ Before constructing the trainer, verify the [account prerequisites](/01-prerequi
 
 ## 2. Resolve data and the output destination
 
-Run the session setup first. It initializes `sess`, `role`, `bucket_name`, `default_prefix`, and the AWS clients. Then the notebook retrieves the named training and validation datasets:
+Run the session setup first. It initializes `sess`, `role`, `bucket_name`, `default_prefix`, and the AWS clients, then resolves and prints a ready `mlflow_app_arn`. A configured `MLFLOW_APP_ARN` in `config.py` is reused and waited for; invalid or inaccessible explicit ARNs fail without replacement. An empty ARN first reuses the uniquely matching tagged `workshop-mlflow-<stack UUID>` app, ahead of any named workshop duplicate. Ambiguous matches stop setup and request an explicit ARN; pending apps are waited for, and failed apps are not replaced. Only if no workshop app matches does setup use the pinned SDK's native discovery/create path, with `AccountDefaultStatus="DISABLED"` on creation and no domain requirement. Setting both creation overrides selects named creation instead. No manual ARN or stack update is required for discovery. Save the resolved ARN for evaluation; see [MLflow setup behavior](/01-prerequisites/3-sagemaker/#7-reuse-or-create-the-workshop-mlflow-app). The trainer receives this ARN explicitly and records runs under `contractnli-serverless-sft`. Then the notebook retrieves the named training and validation datasets:
 
 ```python
 from sagemaker.ai_registry.dataset import DataSet
@@ -85,6 +85,8 @@ trainer = SFTTrainer(
     model=base_model_id,
     training_type=TrainingType.LORA,
     model_package_group=model_package_group_name,
+    mlflow_resource_arn=mlflow_app_arn,
+    mlflow_experiment_name="contractnli-serverless-sft",
     training_dataset=training_dataset,
     validation_dataset=val_dataset,
     s3_output_path=output_path,
@@ -118,13 +120,13 @@ trainer.hyperparameters.lora_alpha = 64
 | `lora_rank = 32`              | Adapter rank                                     | Capacity and trainable-parameter footprint            |
 | `lora_alpha = 64`             | Adapter scaling                                  | Keep rank and scaling recorded together               |
 
-An epoch is a pass through the data the trainer actually uses. An optimizer step is an update after batching and any accumulation. With a dataset smaller than a large effective batch schedule might suggest, ten epochs can still represent relatively few updates. Do not equate ten epochs here with ten epochs under Track 2's different batching and loss pipeline.
+An epoch is a pass through the data the trainer actually uses. An optimizer step is an update after batching and any accumulation. With a dataset smaller than a large effective batch schedule might suggest, ten epochs can still represent relatively few updates. Do not equate ten epochs here with ten epochs under the 4B Training jobs journey's different batching and loss pipeline.
 
 ### Do not treat the step-count demonstration as telemetry
 
 The notebook's arithmetic cell fixes `records = 423` and `over_limit = 108`; it does not tokenize this run's data or read its logs. Other notebook prose describes different sequence caps. Consequently, its printed retained count, step count, and schedule calculation are illustrations from prior settings, not evidence about this 30B-A3B run. Inspect actual preprocessing, resolved limits, and training logs before reporting coverage. Truncating a record and dropping it entirely have different effects on supervision.
 
-The intended SFT boundary is the completion: the contract and checklist provide context, while the JSON answer provides targets. Because this path delegates training internals to a managed recipe, verify loss-mask and preprocessing behavior through the resolved recipe and available logs rather than copying Track 2's `completion_only_loss` YAML into this API.
+The intended SFT boundary is the completion: the contract and checklist provide context, while the JSON answer provides targets. Because this path delegates training internals to a managed recipe, verify loss-mask and preprocessing behavior through the resolved recipe and available logs rather than copying the 4B Training jobs journey's `completion_only_loss` YAML into this API.
 
 ## 5. Submit and monitor remotely
 
@@ -138,21 +140,35 @@ The returned object and printed name mean that submission occurred, not that the
 
 ```python
 import time
-from sagemaker.core.resources import TrainingJob
 
+started = time.monotonic()
 while True:
-    job = TrainingJob.get(training_job_name=TRAINING_JOB_NAME)
-    print(f"{job.training_job_status} / {job.secondary_status}")
-    if job.training_job_status in ("Completed", "Failed", "Stopped"):
+    job = sm_client.describe_training_job(TrainingJobName=TRAINING_JOB_NAME)
+    status, secondary = job["TrainingJobStatus"], job["SecondaryStatus"]
+    print(f"[{(time.monotonic() - started) / 60:5.1f} min] {status} / {secondary}")
+    if status in ("Completed", "Failed", "Stopped"):
         break
-    time.sleep(120)
+    time.sleep(60)
+
+if status != "Completed":
+    reason = job.get("FailureReason") or "No failure reason reported; inspect CloudWatch logs."
+    raise RuntimeError(f"{TRAINING_JOB_NAME}: {status} / {secondary}: {reason}")
+print("Completed. Continue to notebook 3 for evaluation.")
 ```
 
 ![Studio training jobs](/static/images/lab-1-sft/studio-jobs-training.png)
 
-Expected output is a sequence of primary and secondary status strings, ending in a terminal state. The loop deliberately stops for failures too; its completion is not a success assertion. Inspect logs for preprocessing counts, training/validation loss, saving, and registration. A decreasing training loss does not prove improved contradiction detection or correct citations.
+Expected output is a sequence of primary and secondary status strings every 60 seconds, ending in a terminal state. The cell raises for `Failed` or `Stopped` and prints completion only for `Completed`. Before polling, the notebook prints direct job-console and CloudWatch links plus a signed MLflow App URL; open the latter within five minutes, or rerun only the link cell for a fresh URL, not training submission. Do not share signed URLs. Inspect logs for preprocessing counts, training/validation loss, saving, and registration. A decreasing training loss does not prove improved contradiction detection or correct citations.
 
 No duration or price is guaranteed. Provisioning, preprocessing, training, saving, and service limits all contribute to elapsed time. Closing the notebook does not stop the job. If you do not intend to finish a submitted run, stop it through the service and verify the terminal state.
+
+### Progress activities: Studio, CloudWatch, and MLflow
+
+While the job runs, open **Studio > Jobs > Training** and select `TRAINING_JOB_NAME`. In the [SageMaker AI console](https://console.aws.amazon.com/sagemaker/), the equivalent navigation is **Training > Training jobs**. Compare the job's input data and resolved configuration with the registry versions you recorded. Follow **View logs**, or open [CloudWatch](https://console.aws.amazon.com/cloudwatch/) under **Logs > Log groups > `/aws/sagemaker/TrainingJobs`**, filtering streams by the exact name and this run's time window. Identify preprocessing, optimizer updates, validation, and export/registration stages.
+
+In Studio, open the **MLflow** application and select the **MLflow App** matching the resolved `mlflow_app_arn` printed during setup, whether reused or newly created. Alternatively use the notebook's temporary app link. Open **Experiments > `contractnli-serverless-sft`** and inspect the current run. Record its ID and compare available training/validation metrics with the logs. Do not create a legacy Tracking Server or another domain. If the app is not visible, verify the resolved ARN, account, Region, and permissions. The app requires no domain association even though Studio provides a convenient UI launch surface.
+
+**Activity:** find one configuration value in the job details and one metric in the run. Explain why a lower loss is not proof of a better evidence citation. If no metric has appeared, use the current CloudWatch stage to distinguish setup from a failure rather than submitting a duplicate job.
 
 ## 6. Verify the package, not just the job
 

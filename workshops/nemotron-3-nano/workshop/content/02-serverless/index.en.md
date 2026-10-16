@@ -1,6 +1,6 @@
 ---
-title: "Track 1: Serverless model customization"
-weight: 20
+title: "Optional: Serverless model customization"
+weight: 30
 ---
 
 ## Adapt Nemotron 3 Nano 30B-A3B with a managed recipe
@@ -9,7 +9,11 @@ This track uses SageMaker AI serverless model customization to fine-tune a model
 
 The executable [config.py](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/01-serverless-workshop/config.py) selects `huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16`. This is the model identity to record, even when older notebook prose discusses another model size. The active-parameter designation does not eliminate the storage needed for all weights or establish task quality by itself.
 
-:image[Supervised fine-tuning concept]{src="/static/images/lab-1-sft/sft_concept.jpeg" height=384}
+This is an optional alternative to the primary [SageMaker Training jobs: 4B](/03-training-jobs/) journey. You can study these pages without running both workflows. If you execute this extension, use an isolated setup and complete its own preparation steps.
+
+![SFT uses expert answer tokens to train model behavior; LoRA updates adapters while base weights remain frozen.](/static/images/general/sft-contractnli.svg)
+
+SFT learns from input/answer demonstrations; LoRA determines which parameters are updated. During training, earlier gold answer tokens condition next-token prediction, while at inference the model generates without the gold answer. The diagram shows the conceptual completion-only objective, not a claim about undocumented internals of a managed recipe. Verify the resolved recipe's masking and preprocessing in the fine-tuning lesson.
 
 ## What you will build
 
@@ -34,7 +38,7 @@ Work in `generative-ai-on-amazon-sagemaker/workshops/fine-tune-nvidia-nemotron-3
 | --- | --- | --- |
 | [Data preparation](/02-serverless/01-data-preparation/) | `1-prepare-data.ipynb` | How raw `choice`/`spans` annotations become `label`/`evidence` and why test uses a different outer schema |
 | [Fine-tuning](/02-serverless/02-fine-tuning/) | `2-fine-tune-llm.ipynb` | How dataset objects, LoRA overrides, role, and package group configure the managed trainer |
-| [Evaluation](/02-serverless/03-evaluation/) | `3-evaluation.ipynb` | How verdict/citation metrics differ and how to audit managed output provenance and judge coverage |
+| [Evaluation](/02-serverless/03-evaluation/) | `3-evaluation.ipynb` with `evaluation_utils.py` | How verdict/citation metrics differ and how to audit managed output provenance and judge coverage |
 | [Deployment](/02-serverless/04-deployment/) | `4-deployment.ipynb` | How a merged prefix, parser configuration, Model, and component produce an invokable endpoint |
 
 ## The task and the prompt boundary
@@ -58,7 +62,7 @@ The notebook sets ten epochs, global batch size 64, learning rate `0.0001`, LoRA
 
 Review [account setup](/01-prerequisites/2-account/) for customization, AI Registry, Model Package, evaluation, S3, role-passing, and Bedrock permissions. The endpoint uses one `ml.g5.12xlarge`; the component allocates four accelerators, matching vLLM tensor parallel size four. The minimum component memory request is host memory, not a GPU cache setting.
 
-::alert[Both tracks default to the same `datasets/contractnli-nda-review` S3 prefix, but Track 2 uploads conversational arrays. Choose one track per setup or isolate all dependent configuration before uploading. Registry version names do not preserve old file contents when fixed S3 keys are overwritten.]{type="warning"}
+::alert[Both tracks default to the same `datasets/contractnli-nda-review` S3 prefix, but the 4B Training jobs journey uploads conversational arrays. Choose one track per setup or isolate all dependent configuration before uploading. Registry version names do not preserve old file contents when fixed S3 keys are overwritten.]{type="warning"}
 
 Before leaving each lesson, save the relevant identifiers: dataset name/version and URI, training-job name, Model Package ARN, evaluation execution ARN, and all hosting resource names. The notebook's newest-resource lookups are conveniences, not experiment isolation. Real-time hosting is provisioned compute even though training is serverless; complete [Clean Up](/04-cleanup/) when finished.
 

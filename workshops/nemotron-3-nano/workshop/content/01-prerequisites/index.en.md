@@ -11,6 +11,6 @@ Before starting the labs, you need access to an AWS account, a SageMaker AI Stud
 
 1. At an AWS-led event, follow [Workshop Studio event access](/01-prerequisites/1-workshop/) to sign in to the supplied account.
 2. If you are working independently, follow [Your own AWS account](/01-prerequisites/2-account/) to prepare the account, Region, permissions, model access, and service quotas.
-3. Follow [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) to open JupyterLab, locate the automatically cloned workshop directory, select the Python 3 kernel, and install notebook dependencies.
+3. Follow [SageMaker AI Studio](/01-prerequisites/3-sagemaker/) to open JupyterLab, locate the automatically cloned workshop directory, select the Python 3 kernel, and install notebook dependencies. Start in `02-smtj-workshop/` for the primary 4B journey.
 
-Use the [workshop comparison](/) to choose the lab you want to complete, or follow your instructor's selection. Once setup is complete, continue to [Serverless customization](/02-serverless/) or [Training jobs](/03-training-jobs/).
+The primary journey is [SageMaker Training jobs: 4B](/03-training-jobs/), which is standalone after this setup. [Optional: Serverless model customization](/02-serverless/) remains available as an alternative extension, not a prerequisite. Review the [workflow comparison](/) before attempting both, since their default S3 keys overlap.

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 470" role="img" aria-labelledby="title desc">
+  <title id="title">Supervised fine-tuning for verdicts and evidence</title>
+  <desc id="desc">An instruction, checklist, and numbered contract form the prompt. A frozen base model with trainable LoRA adapters predicts answer tokens. Expert JSON provides target tokens for completion-only loss. The loss updates only adapters. After training, merged weights and the tokenizer are exported and evaluated on held-out contracts without gold answers in the request.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#334155"/></marker>
+  </defs>
+  <rect width="1040" height="470" rx="12" fill="#ffffff"/>
+  <g font-family="Arial, sans-serif" fill="#172b4d">
+    <text x="30" y="38" font-size="24" font-weight="bold">SFT: learn from expert completions, then test on unseen contracts</text>
+    <rect x="30" y="80" width="255" height="135" rx="10" fill="#eaf2ff" stroke="#254b7c" stroke-width="2"/>
+    <text x="48" y="110" font-size="20" font-weight="bold">Prompt (context)</text>
+    <text x="48" y="142" font-size="17">Instruction + 17-item checklist</text>
+    <text x="48" y="170" font-size="17">Contract with numbered spans</text>
+    <text x="48" y="197" font-size="16">No loss on prompt positions</text>
+    <rect x="355" y="80" width="305" height="135" rx="10" fill="#edf7ed" stroke="#285e38" stroke-width="2"/>
+    <text x="374" y="110" font-size="20" font-weight="bold">Base model: frozen weights</text>
+    <text x="374" y="142" font-size="17">LoRA adapters: trainable</text>
+    <text x="374" y="170" font-size="17">Predict next answer token</text>
+    <text x="374" y="197" font-size="16">Condition on earlier gold tokens</text>
+    <rect x="730" y="80" width="280" height="135" rx="10" fill="#fff5e6" stroke="#855000" stroke-width="2"/>
+    <text x="748" y="110" font-size="20" font-weight="bold">Completion-only loss</text>
+    <text x="748" y="142" font-size="17">Compare predicted probabilities</text>
+    <text x="748" y="170" font-size="17">with expert target tokens</text>
+    <text x="748" y="197" font-size="16">Mask prompt and padding</text>
+    <rect x="730" y="270" width="280" height="80" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="2"/>
+    <text x="748" y="300" font-size="20" font-weight="bold">Expert completion</text>
+    <text x="748" y="330" font-size="17">JSON verdicts + evidence IDs</text>
+    <text x="360" y="270" font-size="17" font-weight="bold">Loss updates adapters, not base weights</text>
+    <rect x="30" y="385" width="980" height="58" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="2"/>
+    <text x="48" y="420" font-size="18">After training: merge + export tokenizer → deploy → held-out evaluation (no gold in request)</text>
+  </g>
+  <g fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)">
+    <path d="M285 145 H355"/>
+    <path d="M660 145 H730"/>
+    <path d="M870 270 V215"/>
+    <path d="M770 215 V238 H505 V215"/>
+  </g>
+</svg>

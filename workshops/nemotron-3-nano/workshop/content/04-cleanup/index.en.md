@@ -49,7 +49,7 @@ An endpoint can continue to hold compute after a component is removed, so compon
 
 Use the **Clean up** section of [02-smtj-workshop/4-evaluation.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/02-smtj-workshop/4-evaluation.ipynb). The current `3-deployment.ipynb` deliberately leaves hosting running and has no teardown cells. This direct endpoint has no inference component. Cleanup is not guarded by `RUN_ENDPOINT_EVAL` or `RUN_JUDGE_EVAL`; even reference-only analysis can reach deletions if you run every cell.
 
-In a fresh evaluation kernel, run its Setup cell to define `MODEL_SLUG`, `rname`, and `ENDPOINT_NAME`, then verify the reconstructed names against your recorded deployment and account/Region. The following staged equivalent uses those evaluation variables rather than relying on variables from the deployment kernel. Run it only for your own resources that are no longer needed:
+In a fresh evaluation kernel, run its Setup cell to import `evaluation_utils as E` and define `MODEL_SLUG` and `ENDPOINT_NAME`, then verify the reconstructed names against your recorded deployment and account/Region. The following staged equivalent uses those evaluation variables rather than relying on variables from the deployment kernel. Run it only for your own resources that are no longer needed:
 
 ```python
 from sagemaker.core.resources import Endpoint, EndpointConfig, Model
@@ -61,21 +61,21 @@ Endpoint.get(ENDPOINT_NAME).delete()
 Wait until endpoint deletion completes, then run:
 
 ```python
-EndpointConfig.get(rname(stem, "-sft-cfg")).delete()
-Model.get(rname(stem, "-sft-m")).delete()
+EndpointConfig.get(E.rname(stem, "-sft-cfg")).delete()
+Model.get(E.rname(stem, "-sft-m")).delete()
 ```
 
 The notebook's cleanup loop catches errors and prints skipped operations. Review those messages individually. An endpoint still deleting can keep dependent cleanup from succeeding, while an authorization error requires a permissions fix. Do not repeatedly submit deletion requests without checking the reason.
 
-The `watch_endpoint` helper's local timeout does not stop the remote deployment. If you abandoned a startup attempt, find and delete that endpoint explicitly. Keep Track 2 hosting only until any wanted fresh predictions have been collected and saved. Reading shipped references or running Bedrock judging over precomputed responses does not require retaining an endpoint. If you stop after deployment, still complete hosting cleanup.
+The `watch_endpoint` helper's local timeout does not stop the remote deployment. If you abandoned a startup attempt, find and delete that endpoint explicitly. Keep the 4B endpoint running only until any wanted fresh predictions have been collected and saved. Reading shipped references or running Bedrock judging over precomputed responses does not require retaining an endpoint. If you stop after deployment, still complete hosting cleanup.
 
 ## 4. Check active jobs and retained compute
 
-For Track 1, inspect the specific training job and each SageMaker evaluation pipeline execution you launched. Also inspect any corresponding Bedrock evaluation jobs. Let wanted work finish, or stop unwanted active work through the corresponding service and verify a terminal state. Stopping one orchestration layer should not be assumed to have removed every downstream resource; inspect the actual jobs.
+For the optional serverless workflow, inspect the specific training job and each SageMaker evaluation pipeline execution you launched. Also inspect any corresponding Bedrock evaluation jobs. Let wanted work finish, or stop unwanted active work through the corresponding service and verify a terminal state. Stopping one orchestration layer should not be assumed to have removed every downstream resource; inspect the actual jobs.
 
-For Track 2, inspect both the Training job and its warm-pool state. The notebook configures `KEEP_ALIVE_SECONDS = 1800`, which can retain billed training compute after the job has completed. Release an unwanted retained pool through the supported SageMaker warm-pool controls or verify that retention has expired. Changing a Python variable to zero after submission does not update an existing job or pool.
+For the 4B Training jobs journey, inspect both the Training job and its warm-pool state. The current notebook defaults to `KEEP_ALIVE_SECONDS = 0`, so it does not request retained training compute. Earlier or deliberately modified runs may still have a billed warm pool. Release an unwanted retained pool through the supported SageMaker warm-pool controls or verify that retention has expired. Changing a Python variable to zero after submission does not update an existing job or pool.
 
-If you enabled Track 2's `RUN_JUDGE_EVAL`, also inspect both printed Bedrock evaluation-job ARNs, labeled `base` and `tuned`. A failure during the second submission can leave the first job running. Let wanted jobs finish or stop unwanted jobs through the approved service controls, and verify terminal states; interrupting `wait_for_judge` or deleting the endpoint does not cancel them.
+If you enabled the 4B Training jobs journey's `RUN_JUDGE_EVAL`, also inspect both printed Bedrock evaluation-job ARNs, labeled `base` and `tuned`. A failure during the second submission can leave the first job running. Let wanted jobs finish or stop unwanted jobs through the approved service controls, and verify terminal states; interrupting `wait_for_judge` or deleting the endpoint does not cancel them.
 
 For future one-shot runs, set retention to zero before constructing and submitting the trainer if you do not need a pool. The training stopping condition is also not a cleanup instruction for hosting or Studio; those resources remain separate.
 
@@ -94,7 +94,7 @@ Decide what to retain for reproducibility before deleting objects. A registered 
 | Training jobs | Job-specific `output/model.tar.gz` and configured checkpoint storage       | Confirm exact job/output prefix; do not assume the checkpoint sync prefix contains usable resumable checkpoints   |
 | Training jobs | Local `./tmp/test.jsonl`, downloaded dataset/tokenizer caches              | Preserve only approved materials needed for later work                                                            |
 
-Track 2 does not create Model Packages or AI Registry datasets in its implemented workflow. Do not delete another track's registry assets. Its optional live judge writes `contractnli-judge-eval/input/{base,tuned}-30.jsonl` with default settings and service outputs under `contractnli-judge-eval/output` in the session bucket. Inspect the recorded job IDs and actual object keys before retaining or removing them, since this prefix is also used elsewhere in the workshop. The evaluation notebook keeps fresh predictions and summary variables in kernel memory rather than automatically saving new local results files; export approved evidence before stopping the kernel. Preserve shipped `baselines/` as source references, not as your own run output. Both tracks share default dataset keys, so verify object ownership and consumers before removing anything.
+The 4B Training jobs journey does not create Model Packages or AI Registry datasets in its implemented workflow. Do not delete another track's registry assets. Its optional live judge writes `contractnli-judge-eval/input/{base,tuned}-30.jsonl` with default settings and service outputs under `contractnli-judge-eval/output` in the session bucket. Inspect the recorded job IDs and actual object keys before retaining or removing them, since this prefix is also used elsewhere in the workshop. The evaluation notebook keeps fresh predictions and summary variables in kernel memory rather than automatically saving new local results files; export approved evidence before stopping the kernel. Preserve shipped `baselines/` as source references, not as your own run output. Both tracks share default dataset keys, so verify object ownership and consumers before removing anything.
 
 The notebooks do not implement a comprehensive registry, S3, and CloudWatch teardown. Perform that review separately using approved console or service procedures, scoped to the recorded resources. Retained S3 objects, object versions where enabled, logs, and space storage can remain after compute is gone. Follow your organization's retention requirements rather than deleting audit evidence indiscriminately.
 
@@ -102,13 +102,19 @@ The notebooks do not implement a comprehensive registry, S3, and CloudWatch tear
 
 Save approved results, stop running notebook kernels, then stop the JupyterLab space. Review persistent space storage separately; stopping compute does not erase saved files. If you created workshop-specific CloudFormation infrastructure, inspect the stack resources and retention requirements before deleting the stack. Do not remove a shared domain, user profile, VPC, role, bucket, or KMS key used by other workloads.
 
+MLflow Apps are independent of notebook and training-job lifetimes. Record the resolved ARN from each workflow; both journeys may reuse one app, but empty-ARN discovery does not guarantee that they do. Save required run history and identify ownership before deletion. CloudFormation manages and deletes only its own native app when the setup stack is deleted, not apps created by notebook fallback or other owners. Do not reuse a stack-owned app for unrelated workloads if you intend to delete the stack. If a stack operation fails or times out, inspect app status and stack events before retrying; an access error is not evidence that the app is gone.
+
+For notebook-created apps, review the named `nemotron-contractnli-workshop` app or native SDK `finetune-mlflow-*` app identified by the printed ARN, including any still provisioning after an interrupted setup. Notebook cleanup does not delete them. Follow approved app deletion and retention procedures only after checking for other users. For a discovered or manually selected shared app, follow its owner's policy, not notebook ownership assumptions. Creation does not assign account/domain defaults, and setup does not update existing app settings.
+
+Check each app's actual artifact-store URI. Defaults use `mlflow-artifacts/` in the notebook or SDK-selected bucket, but role/artifact overrides and existing apps can differ. App deletion does not empty the artifact bucket. Review artifacts, other workshop outputs, and retained storage separately; a nonempty stack-owned bucket can prevent stack deletion. Do not empty a shared bucket indiscriminately. Review [SageMaker AI pricing](https://aws.amazon.com/sagemaker/ai/pricing/) and retained S3 storage costs separately from training and Studio usage; closing JupyterLab is not MLflow cleanup.
+
 At an instructor-led event, follow the instructor's account-cleanup guidance. Export only permitted non-sensitive material before temporary access expires, never credentials or unrelated account data.
 
 ## Final verification
 
 - The intended endpoints are absent, not merely idle or no longer receiving traffic.
-- No unwanted Track 1 inference component remains, and dependent Model/EndpointConfig cleanup succeeded.
-- No unwanted training or evaluation job is active, and Track 2 warm-pool retention is resolved.
+- No unwanted inference component from the optional serverless workflow remains, and dependent Model/EndpointConfig cleanup succeeded.
+- No unwanted training or evaluation job is active, and any Training job warm-pool retention is resolved.
 - Retained datasets, packages, artifacts, results, and logs have an explicit owner and retention decision.
 - Studio compute is stopped when no longer needed, and shared infrastructure remains intact.
 - Any skipped or failed cleanup action has been investigated rather than silently accepted.

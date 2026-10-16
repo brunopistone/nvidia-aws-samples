@@ -120,6 +120,16 @@ Parameters:
     MaxValue: 100
 
 Conditions:
+  # MLflow Apps are not available in these seven RegionMap regions.
+  HasMlflowApp: !Not
+    - !Or
+      - !Equals [!Ref "AWS::Region", af-south-1]
+      - !Equals [!Ref "AWS::Region", ap-east-1]
+      - !Equals [!Ref "AWS::Region", eu-south-1]
+      - !Equals [!Ref "AWS::Region", ap-northeast-3]
+      - !Equals [!Ref "AWS::Region", ap-southeast-3]
+      - !Equals [!Ref "AWS::Region", me-south-1]
+      - !Equals [!Ref "AWS::Region", me-central-1]
   HasThreeOrMoreAZs: !Or
     - !Equals [!FindInMap [RegionMap, !Ref "AWS::Region", AZCount], 3]
     - !Equals [!FindInMap [RegionMap, !Ref "AWS::Region", AZCount], 4]
@@ -919,6 +929,21 @@ Resources:
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/AWSCloudTrail_FullAccess"
         - !Sub "arn:${AWS::Partition}:iam::aws:policy/CloudWatchFullAccessV2"
 
+  WorkshopMlflowApp:
+    Type: AWS::SageMaker::MlflowApp
+    Condition: HasMlflowApp
+    Properties:
+      Name: !Sub
+        - "workshop-mlflow-${StackUuid}"
+        - StackUuid: !Select [2, !Split ["/", !Ref "AWS::StackId"]]
+      ArtifactStoreUri: !Sub "s3://${StudioBucket}/mlflow-artifacts/"
+      RoleArn: !GetAtt SageMakerExecutionRole.Arn
+      # Serverless training registers its own package; SMTJ deploys its S3 artifact.
+      ModelRegistrationMode: AutoModelRegistrationDisabled
+      Tags:
+        - Key: WorkshopStackId
+          Value: !Ref "AWS::StackId"
+
   # SageMaker Studio Domain
   StudioDomain:
     Type: AWS::SageMaker::Domain
@@ -1188,6 +1213,20 @@ Resources:
       SageMakerImageVersionAlias: "4.5.0"
 
 Outputs:
+  MlflowAppArn:
+    Condition: HasMlflowApp
+    Description: Workshop MLflow App ARN; copy into MLFLOW_APP_ARN in each selected track's config.py.
+    Value: !GetAtt WorkshopMlflowApp.Arn
+
+  MlflowProvisioning:
+    Description: MLflow App regional provisioning status; infrastructure support does not imply model availability.
+    Value:
+      !If [
+        HasMlflowApp,
+        "Standalone MLflow App provisioned",
+        "Unavailable in this Region; use us-east-1 or us-west-2 for the workshop",
+      ]
+
   VpcId:
     Description: VPC ID
     Value: !Ref VPC

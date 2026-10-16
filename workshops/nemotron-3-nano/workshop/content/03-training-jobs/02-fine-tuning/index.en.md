@@ -7,7 +7,7 @@ weight: 2
 
 You will assemble a SageMaker Training job from source code, a container, compute configuration, and three input channels; interpret the model-specific BF16 LoRA recipe; follow how TRL loads, trains, and exports the model; and preserve an exact artifact handoff for deployment.
 
-::alert[Open [02-smtj-workshop/2-fine-tune-llm.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/02-smtj-workshop/2-fine-tune-llm.ipynb). The executable configuration currently uses **one epoch on one `ml.g5.2xlarge`**. Older notebook paragraphs describing ten epochs, four GPUs, or four data channels do not describe the current code.]{type="info"}
+::alert[Open [02-smtj-workshop/2-fine-tune-llm.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/02-smtj-workshop/2-fine-tune-llm.ipynb). The executable configuration uses **one epoch on one single-GPU instance**, selected from five ordered Instance Preferences with `ml.g5.2xlarge` preferred. Older notebook paragraphs describing ten epochs, four GPUs, or four data channels do not describe the current code.]{type="info"}
 
 ## Understand the ModelTrainer
 
@@ -15,7 +15,17 @@ You will assemble a SageMaker Training job from source code, a container, comput
 
 The configured base model is `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`. The recipe loads BF16 weights and adds LoRA; `load_in_4bit: false` means this run is **not QLoRA**. Installed dependencies such as bitsandbytes, DeepSpeed, or distributed helpers do not mean those execution paths are enabled.
 
-For an ordinary LoRA update, \(W' = W + (\alpha/r)BA\). Training learns the low-rank matrices while freezing the base weight matrix. This reduces trainable parameters and optimizer state, but does not remove the need to hold the base model and training activations. A merged export applies the learned update to the base weights so serving does not have to load an adapter separately.
+### SFT is the objective; LoRA is the parameter-update method
+
+![Completion-only SFT compares predicted answer tokens with expert JSON and updates LoRA adapters while base weights remain frozen.](/static/images/general/sft-contractnli.svg)
+
+SFT learns to produce expert demonstrations under a given input. Training uses the correct preceding answer tokens when predicting each next token, often called teacher forcing. Serving has no gold answer and instead uses its own generated prefix. A low training loss therefore does not guarantee a complete or correct generated checklist. Hold out whole contracts and measure verdicts and citations after deployment.
+
+This recipe masks prompt and padding positions so only completion tokens contribute to the loss. Masking does not remove the contract from context: the model still attends to that context when predicting the answer. Inspect full template-rendered lengths because truncation can remove supervised tokens or entire checklist entries. Validation loss uses the development split; the held-out test split is not a training input.
+
+For an ordinary LoRA update, `W_updated = W + (alpha / rank) * B * A`. If `W` has `output_dim * input_dim` parameters, the two low-rank matrices contain `rank * (input_dim + output_dim)` trainable parameters. Base weights stay frozen. Rank controls update capacity, alpha controls scaling, and dropout regularizes the adapter path; none directly measures task quality. This reduces trainable parameters and optimizer state, but does not remove base weights, activations, or temporary tensors from memory. The configured rank is 32 and alpha is 64.
+
+A merged export applies the learned update to the base weights so serving does not need a separate adapter. The merged artifact is larger than the adapter alone and must include compatible configuration and tokenizer files. Select target modules by their actual execution path: a module name that exists in the architecture is not sufficient if fused code bypasses its adapted forward method. The model-specific table below explains those choices.
 
 ## 1. Verify the inputs before provisioning compute
 
@@ -54,16 +64,17 @@ The notebook exports `model_id`, `mlflow_uri`, and `mlflow_experiment_name` into
 import os
 
 os.environ["model_id"] = BASE_MODEL_ID
-os.environ["mlflow_uri"] = ""
+os.environ["mlflow_uri"] = mlflow_app_arn
 os.environ["mlflow_experiment_name"] = "nemotron-3-nano-4b-contractnli-sft"
 ```
 
-The following YAML reproduces the executable settings, with comments condensed and the model variable shown as its configured value. It is a configuration reference for the notebook's existing write cell, not a separate `scripts/args.yaml` file. Run the notebook's full shell cell, inspect the expanded result, then run its upload cell.
+The setup cell resolves a ready `mlflow_app_arn` before continuing. If `MLFLOW_APP_ARN` is configured, it reuses that exact app and waits; an invalid or inaccessible explicit ARN fails without replacement. Leaving it empty first reuses the uniquely matching tagged `workshop-mlflow-<stack UUID>` app, scoped to the notebook role, ahead of any `nemotron-contractnli-workshop` duplicate. Ambiguous matches stop setup and request an explicit ARN; pending apps are waited for, and failed apps are not replaced. Only if no stack app matches does setup reuse or create `nemotron-contractnli-workshop` in the current account/Region, using the notebook role and artifact bucket unless overrides are set. No manual ARN or stack update is required for discovery. See [MLflow setup behavior](/01-prerequisites/3-sagemaker/#7-reuse-or-create-the-workshop-mlflow-app). The following YAML reproduces the executable settings with comments condensed, the model variable shown as its configured value, and the MLflow ARN shown as a placeholder. It is a configuration reference for the notebook's existing write cell, not a separate `scripts/args.yaml` file. Run the notebook's full shell cell, inspect the expanded result for the actual app ARN, then run its upload cell.
 
 ```yaml
 model_id: "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16"
-mlflow_uri: ""
+mlflow_uri: "<resolved MLflow App ARN>"
 mlflow_experiment_name: "nemotron-3-nano-4b-contractnli-sft"
+mlflow_log_model: false
 train_dataset_path: "/opt/ml/input/data/train/dataset.jsonl"
 val_dataset_path: "/opt/ml/input/data/val/dataset.jsonl"
 dataset_format: "prompt_completion"
@@ -132,24 +143,46 @@ The helper favors Transformers' native model implementation when it is available
 
 ### Effective batch and early stopping
 
-The selected instance has one GPU. With one sample per device and four accumulation steps, the nominal effective batch is \(1\times1\times4=4\) records per optimizer update, except for a final partial accumulation. `Torchrun()` remains configured, but does not make this a four-GPU job. If every one of 423 records contributes and final partial accumulation is kept, the simple batch arithmetic is about \(\lceil423/4\rceil=106\) updates per epoch; use actual trainer logs for the realized count.
+The selected instance has one GPU. With one sample per device and four accumulation steps, the nominal effective batch is `1 GPU * 1 record * 4 accumulation steps = 4 records` per optimizer update, except for a final partial accumulation. `Torchrun()` remains configured, but does not make this a four-GPU job. If every one of 423 records contributes and final partial accumulation is kept, the simple arithmetic is `ceil(423 / 4) = 106` updates per epoch. Here `ceil` means round up to the next integer; use actual trainer logs for the realized count.
 
 `early_stopping: true` adds `EarlyStoppingCallback(patience=3, threshold=0.01)` and selects the best model by decreasing `eval_loss`. Both save and evaluation strategies are `epoch`, satisfying the intended best-checkpoint workflow. However, a one-epoch run cannot establish a multi-epoch plateau with patience three. The current recipe does not automatically extend itself to ten epochs. Treat validation loss as a training diagnostic, not a substitute for verdict and evidence scoring.
 
 ## 3. Inspect the training environment
 
-The notebook resolves a SageMaker PyTorch training image for the selected Region and instance type:
+### Instance Preferences
+
+The notebook supplies five candidates in this exact preference order:
+
+| Order | Instance type    | GPU  | GPU memory | Host RAM |
+| ----- | ---------------- | ---- | ---------- | -------- |
+| 1     | `ml.g5.2xlarge`  | A10G | 24 GB      | 32 GB    |
+| 2     | `ml.g6.2xlarge`  | L4   | 24 GB      | 32 GB    |
+| 3     | `ml.g6e.2xlarge` | L40S | 48 GB      | 64 GB    |
+| 4     | `ml.g5.xlarge`   | A10G | 24 GB      | 16 GB    |
+| 5     | `ml.g6.xlarge`   | L4   | 24 GB      | 16 GB    |
+
+SageMaker selects the first type with available capacity and launches one instance of that type, not one of every candidate. If none has capacity, this GPU job waits and retries subject to the service's pending-time limit. Preferences do not reserve capacity, guarantee availability, or choose the cheapest or fastest GPU. SageMaker selects by capacity, so the container and workload must support every candidate. See [Instance preference lists for training jobs](https://docs.aws.amazon.com/sagemaker/latest/dg/train-instance-preferences.html).
+
+Training quota must cover the requested count for **every** listed type; insufficient quota for any candidate rejects the request even if an earlier type could run. All five candidates have one GPU, so fallback preserves the nominal effective batch of four without changing the recipe. GPU architecture, memory, host RAM, runtime, and price can still differ. The notebook's timing example on `ml.g5.2xlarge` is a reference run, not a duration promise for the alternatives.
+
+The notebook resolves a SageMaker PyTorch training image for the Region using the first preference. The same GPU image is used for every candidate; this lookup does not report which type SageMaker actually selects:
 
 ```python
 from sagemaker.core import image_uris
 
-instance_type = "ml.g5.2xlarge"
+instance_types = [
+    "ml.g5.2xlarge",
+    "ml.g6.2xlarge",
+    "ml.g6e.2xlarge",
+    "ml.g5.xlarge",
+    "ml.g6.xlarge",
+]
 instance_count = 1
 image_uri = image_uris.retrieve(
     framework="pytorch",
     region=region,
     version="2.8.0",
-    instance_type=instance_type,
+    instance_type=instance_types[0],
     image_scope="training",
 )
 print(image_uri)
@@ -162,6 +195,7 @@ Notebook-side package installation does not update the training container, and c
 ## 4. Configure the SageMaker job
 
 ```python
+from sagemaker.core.shapes import InstancePreference
 from sagemaker.core.training.configs import (
     CheckpointConfig, Compute, OutputDataConfig, SourceCode, StoppingCondition,
 )
@@ -173,9 +207,9 @@ source_code = SourceCode(
     requirements="requirements.txt",
     entry_script="train.py",
 )
-KEEP_ALIVE_SECONDS = 1800
+KEEP_ALIVE_SECONDS = 0
 compute_configs = Compute(
-    instance_type=instance_type,
+    instance_preferences=[InstancePreference(instance_type=t) for t in instance_types],
     instance_count=instance_count,
     keep_alive_period_in_seconds=KEEP_ALIVE_SECONDS,
 )
@@ -203,7 +237,7 @@ model_trainer = ModelTrainer(
 
 The allocator option is placed in the environment so it is present when PyTorch initializes CUDA. It targets allocation behavior, not total available memory; it cannot make an inherently oversized workload fit. The two-hour stopping condition is a maximum runtime setting, not a promised training duration.
 
-::alert[The notebook retains training compute for `1800` seconds after the job via a warm pool. That can incur charges after training completes and needs the applicable quota. For a one-shot workshop run, set `KEEP_ALIVE_SECONDS = 0` **before** constructing and submitting the job if you do not intend to retain a pool. Changing the variable after submission does not update an existing pool.]{type="warning"}
+::alert[The current notebook sets `KEEP_ALIVE_SECONDS = 0`, requesting no warm-pool retention after training. A nonzero value is an explicit opt-in to potentially billed retained compute and requires a separate warm-pool quota. Set the intended value **before** constructing and submitting the job. Changing the variable after submission does not update an existing pool; inspect earlier jobs separately.]{type="warning"}
 
 ### Checkpoint synchronization is not checkpoint placement
 
@@ -221,10 +255,33 @@ data = [
     InputData(channel_name="val", data_source=val_dataset_s3_path),
     InputData(channel_name="config", data_source=train_config_s3_path),
 ]
-model_trainer.train(input_data_config=data, wait=False)
+model_trainer.train(input_data_config=data, wait=False, logs=False)
+training_job = model_trainer._latest_training_job
+if training_job is None:
+    raise RuntimeError("No TrainingJob was created. Check the SDK version and session.")
+TRAINING_JOB_NAME = training_job.training_job_name
+print(f"Launched: {TRAINING_JOB_NAME}")
 ```
 
-The method returns before the remote work is complete. Save the exact submitted job name from the notebook output or Studio job listing, rather than relying only on a latest-match lookup later. Monitor Studio **Jobs**, **Training** and CloudWatch for installation, dataset loading, model initialization, training/evaluation, and export stages.
+The current SDK path stores the created resource on `_latest_training_job`; `train()` does not return that resource. This is version-sensitive private SDK state, so use the supplied notebook/dependency versions and retain the printed name. The notebook's **Follow the run** cell prints job details and CloudWatch links plus a five-minute pre-signed MLflow App URL. Rerun that cell for a fresh UI link if it expires; do not save the signed URL as a public reference. The subsequent wait cell polls primary/secondary status every 60 seconds and raises for `Failed` or `Stopped` rather than treating any terminal state as success.
+
+After polling reaches a terminal state, that cell reports the actual selection from `DescribeTrainingJob`, using the following lines:
+
+```python
+selected = job["ResourceConfig"].get("SelectedInstanceType", "not selected yet")
+print(f"\ninstance type: {selected}")
+```
+
+`SelectedInstanceType` is absent until selection occurs; the fallback text is not an instance name. Do not infer the actual type from `instance_types[0]` or the image lookup. Retain the reported type with the job record and use its regional SageMaker training rate for cost analysis. The configured count remains one regardless of which candidate is selected.
+
+The method returns before the remote work is complete. Save the exact submitted job name rather than relying only on a latest-match lookup later. Use the wait time for these progress activities:
+
+1. In **SageMaker AI Studio**, open **Jobs > Training** and select the submitted job. Alternatively, open the [SageMaker AI console](https://console.aws.amazon.com/sagemaker/) in the same Region and choose **Training > Training jobs**. Compare the exact name, input channels, image, ordered instance preferences, and count of one with your configuration. In the **Instance type preferences** table, record the type marked **Selected**, or **Pending selection** while capacity is unresolved. Note both primary and secondary status.
+2. From the job details, follow **View logs** to [CloudWatch](https://console.aws.amazon.com/cloudwatch/). If that link is unavailable, open **Logs > Log groups > `/aws/sagemaker/TrainingJobs`** and filter streams by the exact job name. Set the time window to this run. Find dependency installation, dataset loading, model initialization, optimizer updates, validation, and export rather than interpreting a quiet notebook as a stalled job.
+3. Before metric points appear, trace one train-channel URI back to data preparation and identify the YAML fields controlling batch size, completion-only loss, and the token cap. During training, compare actual optimizer steps with the nominal `ceil(423 / 4)` calculation. At epoch end, inspect validation loss, then confirm merging and upload finish before calling the job complete.
+4. Open the configured MLflow App as described below. Compare training and validation metrics, recording the run ID and corresponding SageMaker job name. Missing startup metrics may simply precede the training loop; use CloudWatch to distinguish healthy installation from failure.
+
+**Checkpoint:** record the current stage and one piece of evidence for it. A completed polling cell is not proof of `Completed`, and a completed training loop is not proof that export succeeded. If you interrupt monitoring, the remote job continues.
 
 ## 6. Follow the script's actual execution path
 
@@ -240,7 +297,13 @@ The method returns before the remote work is complete. Save the exact submitted 
 
 The training script calls the validation dataset `test_ds` internally, but it loads that variable from `val_dataset_path`. It is not the held-out local `./tmp/test.jsonl`. This naming should not lead you to include test data in training diagnostics.
 
-MLflow is disabled by the notebook's empty `mlflow_uri`. The script enables it only with a non-empty URI and experiment name; it sets `report_to` based on configured tracking integrations. Do not expect an MLflow dashboard from the default settings. CloudWatch and the trainer's saved metrics remain the places to inspect the default run.
+### Open the configured MLflow App and inspect this run
+
+MLflow is enabled by the resolved app ARN and non-empty experiment name in `args.yaml`. The script sets its tracking URI and experiment, includes `mlflow` in `report_to`, and logs training metrics to that app. In **SageMaker AI Studio**, choose the **MLflow** application, find the **MLflow App** matching the resolved `mlflow_app_arn` printed during setup, and open its UI. Select **Experiments > `nemotron-3-nano-4b-contractnli-sft`**, then the run whose start time corresponds to your job. Record its run ID and inspect parameters, training loss, learning rate, epoch/step, and validation loss when available. Metric names and availability follow the installed trainer and logging cadence; do not assume every plot exists before training starts.
+
+Use the standalone app resolved during setup, whether it was precreated, discovered by the workshop name, or newly created. Save its ARN in `config.py` for explicit reuse. Do not create a legacy MLflow Tracking Server or a second Studio domain. The app itself requires no domain association; Studio is a convenient launch surface, not the app's lifecycle owner. See [MLflow App setup](https://docs.aws.amazon.com/sagemaker/latest/dg/mlflow-app-setup.html). If the app is not visible, compare the printed ARN/account/Region and permissions with the instructor instead of provisioning a substitute. Never share a temporary signed UI URL as a durable workshop link.
+
+The training container installs `mlflow==3.16.1` and `sagemaker-mlflow==0.5.0`. Full model logging is separately controlled by `mlflow_log_model`, which defaults to false; experiment metrics do not require logging another copy of the merged weights. MLflow tracking does not change the deployment handoff: notebook 3 uses `model.tar.gz` in S3. The CloudFormation-provisioned app disables automatic registration into SageMaker Model Registry; reused apps retain their existing settings, so verify those separately rather than assuming setup changes them.
 
 ### Export and generation configuration
 

@@ -200,17 +200,17 @@ test_dataset = register(f"{DATASET_PREFIX}-test", s3_paths["test"])
 
 Registration gives later notebooks named dataset objects rather than requiring the data-preparation kernel to remain alive. Wait for imports to become available, and inspect them in Studio under **Assets**, **Datasets**. A successful import is not a substitute for the per-record checks above.
 
-::alert[Both tracks write train and validation to these same default keys, but Track 2 writes conversational arrays. Separate notebook directories do not isolate S3. Use one track per setup or separate the bucket/prefix and resource configuration consistently before uploading. Registry version metadata alone does not preserve old bytes when the notebook overwrites a fixed object key.]{type="warning"}
+::alert[Both tracks write train and validation to these same default keys, but the 4B Training jobs journey writes conversational arrays. Separate notebook directories do not isolate S3. Use one track per setup or separate the bucket/prefix and resource configuration consistently before uploading. Registry version metadata alone does not preserve old bytes when the notebook overwrites a fixed object key.]{type="warning"}
 
 ## Checkpoint and troubleshooting
 
-| Check or symptom                                 | What to inspect before continuing                                                                                |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| All three imports available                      | Save the dataset names, versions, and exact S3 URIs used                                                         |
-| Missing dataset files                            | Confirm working directory and `CONTRACTNLI_DIR`; inspect the download error rather than bypassing TLS validation |
-| Import failure or wrong schema                   | Parse the first and subsequent JSONL records; verify string fields, not Track 2 message arrays                   |
-| Unexpected checklist keys                        | Use `labels.keys()` from the dataset, not a numeric range                                                        |
-| S3 access denied                                 | Check object write permissions and bucket/prefix selection; a registered dataset does not grant S3 access        |
-| Repeated preparation changes an older experiment | Fixed S3 keys were reused; preserve immutable input objects for reproducible runs                                |
+| Check or symptom                                 | What to inspect before continuing                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| All three imports available                      | Save the dataset names, versions, and exact S3 URIs used                                                                        |
+| Missing dataset files                            | Confirm working directory and `CONTRACTNLI_DIR`; inspect the download error rather than bypassing TLS validation                |
+| Import failure or wrong schema                   | Parse the first and subsequent JSONL records; verify string fields, not the message arrays used by the 4B Training jobs journey |
+| Unexpected checklist keys                        | Use `labels.keys()` from the dataset, not a numeric range                                                                       |
+| S3 access denied                                 | Check object write permissions and bucket/prefix selection; a registered dataset does not grant S3 access                       |
+| Repeated preparation changes an older experiment | Fixed S3 keys were reused; preserve immutable input objects for reproducible runs                                               |
 
 You are ready for [Fine-tuning](/02-serverless/02-fine-tuning/) when the three named datasets are available, every target passes validation, and you can explain where a selected verdict's citation comes from.

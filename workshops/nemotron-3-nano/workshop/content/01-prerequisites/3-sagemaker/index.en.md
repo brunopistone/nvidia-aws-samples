@@ -44,10 +44,10 @@ generative-ai-on-amazon-sagemaker/
         └── README.md
 ```
 
-| Lab                                         | Directory below the workshop root |
-| ------------------------------------------- | --------------------------------- |
-| [Serverless customization](/02-serverless/) | `01-serverless-workshop/`         |
-| [Training jobs](/03-training-jobs/)         | `02-smtj-workshop/`               |
+| Lab                                                         | Directory below the workshop root                 |
+| ----------------------------------------------------------- | ------------------------------------------------- |
+| [SageMaker Training jobs: 4B](/03-training-jobs/)           | `02-smtj-workshop/` (primary journey)             |
+| [Optional: Serverless model customization](/02-serverless/) | `01-serverless-workshop/` (alternative extension) |
 
 The file-browser breadcrumb **/** is the JupyterLab root, not the operating system's root directory. The workshop `README.md` is inside the workshop folder. Existing checkouts are preserved on startup, so a previously used space may contain additional files or an earlier source revision. Startup does not update an existing clone or install Python requirements. If an expected notebook is missing, ask your instructor or administrator to verify the source revision before changing the checkout.
 
@@ -75,7 +75,9 @@ Run the notebook's installation cell:
 %pip install -r requirements.txt
 ```
 
-Inspect the full cell output for errors and wait for the kernel to return to **Idle**. Restart the kernel if requested before running the remaining setup cells. Both labs specify `sagemaker>=3.16.0`; use the supplied requirements rather than installing a different SDK generation. This installation prepares the notebook environment, not the separate training or serving environments.
+Inspect the full cell output for errors and wait for the kernel to return to **Idle**, then restart the kernel before running setup. Both requirements files load the shared [constraints-notebook.txt](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/constraints-notebook.txt), which pins `sagemaker==3.21.0`, `sagemaker-core==2.21.0`, and train/serve/mlops modules at `1.21.0`, alongside compatible notebook dependency versions. Keep the parent workshop directory: installing or copying a lab directory alone loses this constraints file and the shared MLflow helper. The SDK metapackage version alone does not establish module compatibility. This installation prepares the notebook environment, not the separate training or serving environments; do not install `scripts/requirements.txt` or its CUDA wheels in JupyterLab.
+
+The source README records successful wheel-only pip resolver dry runs targeting Linux x86_64 / CPython 3.12. These are not proof of a working Studio runtime or compatibility with every preinstalled extension, and cross-platform resolution does not fully emulate native Linux environment markers. In the actual Studio kernel, run `%pip check` after installation and restart, then smoke-test the notebook imports before a paid job. A native Linux install/import check and separate training-DLC smoke test remain necessary.
 
 ## 5. Verify the working directory and imports
 
@@ -96,10 +98,10 @@ print("model:", config.BASE_MODEL_ID)
 
 Both imported files should come from the selected lab directory. The two directories contain helper modules with the same names but different behavior. If you opened the wrong directory, restart the kernel in the correct one rather than continuing with cached imports.
 
-| Lab                      | Expected model configuration                                |
-| ------------------------ | ----------------------------------------------------------- |
-| Serverless customization | `huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16` |
-| Training jobs            | `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`                     |
+| Lab                                      | Expected model configuration                                |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| SageMaker Training jobs: 4B              | `nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16`                     |
+| Optional: Serverless model customization | `huggingface-reasoning-nvidia-nemotron-3-nano-30b-a3b-bf16` |
 
 ## 6. Run the notebook's session setup
 
@@ -113,6 +115,25 @@ sagemaker session region: <AWS Region>
 
 The session can create a default S3 bucket if one is needed. Confirm that the displayed role, bucket, Region, and configured upload prefix belong to your workshop environment before continuing to data preparation.
 
+## 7. Reuse or create the workshop MLflow App
+
+A configured ARN is **optional**. With an empty ARN, both journeys first discover the precreated workshop app automatically. To override discovery, copy the stack's `MlflowAppArn` output into `MLFLOW_APP_ARN` in the selected journey's `config.py`, or use an administrator-approved app ARN in the same Region. Use an `mlflow-app/...` ARN, not a legacy `mlflow-tracking-server/...` ARN or a UI URL. An explicit ARN always takes precedence: invalid, inaccessible, missing, or failed apps stop setup without silently creating a replacement. An app still creating or updating is polled until ready or timed out.
+
+With `MLFLOW_APP_ARN = ""`, the shared [workshop_mlflow.py](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/workshop_mlflow.py) first lists apps and reads `ListTags` for `workshop-mlflow-*` candidates. A match requires the template's `WorkshopStackId` tag to contain a CloudFormation stack ARN in the same account/Region, whose UUID exactly matches the app-name suffix. A supplied role must match the app role; without a role, a supplied artifact URI must match (ignoring trailing slashes). Role takes precedence because the notebook default bucket can differ from the stack bucket. Without either scope, only a unique tag/name match is accepted. Multiple matches stop and request an explicit ARN. This app wins over a previously auto-created `nemotron-contractnli-workshop` duplicate. Pending apps are waited for; failed or unsupported states never trigger replacement. Listing is bounded to 100 pages per operation, and incomplete scans or access errors stop setup rather than creating an app.
+
+Only if no stack app matches does setup reuse the exact `MLFLOW_APP_NAME`, then use these fallback paths if that app is also absent:
+
+| Journey                                  | Automatic behavior when no ARN is configured                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SageMaker Training jobs: 4B              | List apps in the current account/Region and reuse the exact `MLFLOW_APP_NAME`, default `nemotron-contractnli-workshop`, or create it. Creation uses the notebook execution role and `s3://<notebook-bucket>/mlflow-artifacts`; `MLFLOW_ROLE_ARN` and `MLFLOW_ARTIFACT_STORE_URI` optionally override them. Existing app settings are not changed. Multiple same-name apps require an explicit ARN; a failed same-name app is not replaced. |
+| Optional: Serverless model customization | Use the pinned SDK's native discovery/create path: check available domain/account defaults and ready apps, or create a timestamp-named `finetune-mlflow-*` app. No domain is required. Native creation uses the SDK role default and `s3://sagemaker-<region>-<account>/mlflow-artifacts`, with bucket/prefix creation if needed. Set both role/artifact overrides to use the deterministic named workshop path instead.                   |
+
+Both creation paths use `AccountDefaultStatus="DISABLED"`, assign no domain defaults, and do not update existing apps. No Studio domain or legacy Tracking Server is required for the standalone MLflow App; Studio is only a convenient launch surface. CloudFormation precreation is a startup optimization, not a prerequisite. Existing stacks already carry the tag/name combination used for discovery; no stack update is needed.
+
+The shared helper confirms readiness with `DescribeMlflowApp(Arn=...)`, polling creating/updating apps every 15 seconds for up to `MLFLOW_READY_TIMEOUT_SECONDS` (900 by default). The native SDK creation path first has its own wait of up to 600 seconds. Save the printed ARN in `config.py` to reconnect after a timeout and to keep training and evaluation on the same app, especially in shared accounts. Interrupting setup does not cancel app provisioning. SDK discovery/create errors stop setup rather than starting untracked training.
+
+Serverless consumers receive the resolved ARN explicitly; the Training-job notebook passes it as `mlflow_uri` in its inline `args.yaml`. Confirm [IAM and artifact-store permissions](/01-prerequisites/2-account/) for your chosen path before setup. Existing Studio checkouts remain untouched by startup. Local edits on another machine do not update Studio: transfer the revised `workshop_mlflow.py` and both track `config.py` files, or update the checkout to the published revision after preserving local work. Restart the notebook kernel, rerun setup with an empty ARN, and verify the printed ARN identifies the stack app before starting training. No CloudFormation update or deletion of an existing duplicate is required.
+
 ## Troubleshooting
 
 | Symptom                           | Check                                                                                     |
@@ -124,4 +145,4 @@ The session can create a default S3 bucket if one is needed. Confirm that the di
 | S3 access denied                  | Check the displayed role, bucket/prefix, and relevant object and KMS permissions.         |
 | Model or tokenizer download fails | Check model access and the outbound network path.                                         |
 
-Once the dependencies load and the session identifies the intended environment, continue to [Serverless customization](/02-serverless/) or [Training jobs](/03-training-jobs/).
+Once the dependencies load and the session identifies the intended environment, continue to [SageMaker Training jobs: 4B](/03-training-jobs/). The [optional Serverless model customization](/02-serverless/) extension is an alternative, not a prerequisite.

@@ -55,7 +55,44 @@ for number, text in C.doc_spans(doc_example)[:3]:
     print(f"[{number}] {text}")
 ```
 
-The notebook's short Navidec example illustrates why citations matter. Its expert annotation marks `nda-5` and `nda-7`, permissions to share with employees and third parties, as contradictions citing span `[3]`. The same clause can decide multiple checklist items. Another verdict, `nda-2`, cites both `[3, 4]`, while `nda-4` is entailed by `[4]`. This is a worked annotation, not a generated result or evidence of model accuracy.
+### Worked example: clauses, hypotheses, and expected JSON
+
+Read this excerpt from the Navidec example in the linked `1-prepare-data.ipynb`. The span identifiers, wording, and labels below come from that source. Omitted spans and hypotheses remain in the full record; this excerpt is not a complete training example.
+
+```text
+[0] NAVIDEC, INCORPORATED
+[1] TRADE SECRET/NON-DISCLOSURE AGREEMENT
+[3] _______ , agrees that, in consideration for being shown or told about certain
+    trade secrets or property belonging to Navidec, Incorporated, _______ , shall
+    not disclose or cause to be disclosed, disseminated or distributed any
+    information concerning said trade secret or property to any person, entity,
+    business or other individual or company without the prior written permission
+    of Navidec, Incorporated.
+[4] Further, _______ , agrees not to use, either directly or indirectly any of the
+    material, ideas, objects or portions thereof of said trade secret or property
+    disclosed by Navidec, Incorporated in any manner whatsoever without the prior
+    written consent of Navidec, Incorporated.
+
+nda-2: Confidential Information shall only include technical information.
+nda-7: Receiving Party may share some Confidential Information with some
+       third-parties (including consultants, agents and professional advisors).
+nda-5: Receiving Party may share some Confidential Information with some of
+       Receiving Party's employees.
+```
+
+Expected JSON excerpt from the annotated target:
+
+```json
+{
+  "nda-2": { "label": "Contradiction", "evidence": [3, 4] },
+  "nda-7": { "label": "Contradiction", "evidence": [3] },
+  "nda-5": { "label": "Contradiction", "evidence": [3] }
+}
+```
+
+The expert annotation marks employee and third-party sharing as contradictions citing the disclosure restriction in `[3]`. The same clause can decide multiple checklist items. `nda-2` cites both `[3, 4]` because the restriction covers material beyond technical information. The full target also marks the use restriction `nda-4` as entailed by `[4]`. These are worked annotations, not generated results or evidence of model accuracy. Do not generalize this example into a legal rule for every NDA.
+
+**Activity:** identify the words that make `[3]` a prohibition, then locate the prior-written-permission condition. Explain why a permission explicitly granted to employees would require reconsidering the annotated verdict. Inspect the full contract before deciding whether an exception changes the result.
 
 The full checklist has 17 keys but is not numbered consecutively from 1 to 17. Use `labels.keys()` rather than constructing identifiers yourself. One record contains all 17 decisions, so 423 records represent 7,191 labeled decisions but only 423 independently split documents.
 
@@ -117,9 +154,11 @@ There are two serialization layers: a JSONL line is one record, while the assist
 
 The recipe explicitly sets `dataset_format: "prompt_completion"` and `completion_only_loss: true`. The script preserves these columns and passes them to TRL. The intended loss boundary excludes the prompt and supervises the answer, rather than training the model to copy the contract. In conceptual terms, only answer-token positions contribute to the language-model loss:
 
-\[L=-\frac{1}{|T|}\sum*{t\in T}\log p*{\theta}(y*t\mid x,y*{<t})\]
+```text
+L = -(1 / number_of_answer_tokens) * sum(log P(gold_token_t | prompt, earlier_gold_tokens))
+```
 
-Here \(x\) is the prompt and \(T\) is the set of supervised completion positions. Padding and prompt positions must be masked appropriately. This is why the prompt/completion boundary, special tokens, and truncation behavior are training decisions, not merely file formatting.
+The sum covers only supervised completion positions. Padding and prompt positions must be masked appropriately. This is why the prompt/completion boundary, special tokens, and truncation behavior are training decisions, not merely file formatting.
 
 ## 3. Carry reasoning controls through the template
 
@@ -232,7 +271,7 @@ for name in ("train", "val"):
 
 ::alert[The current `4-evaluation.ipynb` implements endpoint scoring, but does not read `./tmp/test.jsonl`. It calls `C.ensure_dataset("./data")` and `C.load("test")`, then rebuilds prompts and gold references from raw ContractNLI using this track's helpers. Preserve the conversational test file for inspection and keep raw data/helper versions consistent. After training, run `3-deployment.ipynb`, then follow [Evaluation](/03-training-jobs/04-evaluation/) to choose shipped references or fresh predictions.]{type="info"}
 
-The default S3 train/validation keys are shared with Track 1, but their schemas differ. Do not overwrite the other track's registered data. A different notebook directory or a new kernel does not create a new S3 namespace; isolate configuration consistently before running both tracks.
+The default S3 train/validation keys are shared with the optional serverless workflow, but their schemas differ. Do not overwrite the other track's registered data. A different notebook directory or a new kernel does not create a new S3 namespace; isolate configuration consistently before running both tracks.
 
 ## Checkpoint and troubleshooting
 

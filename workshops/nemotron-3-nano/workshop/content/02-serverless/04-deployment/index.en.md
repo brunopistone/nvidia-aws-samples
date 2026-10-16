@@ -9,6 +9,8 @@ You will resolve the customized model's merged weights from Model Registry, pack
 
 ::alert[Open [01-serverless-workshop/4-deployment.ipynb](https://github.com/aws-samples/generative-ai-on-amazon-sagemaker/blob/main/workshops/fine-tune-nvidia-nemotron-3-sagemaker-ai/01-serverless-workshop/4-deployment.ipynb). This lesson deploys Nemotron 3 Nano 30B-A3B to a SageMaker real-time endpoint, not to Bedrock Custom Model Import. Serverless customization does not make this hosting infrastructure serverless.]{type="info"}
 
+The [Bedrock Custom Model Import supported-architecture list](https://docs.aws.amazon.com/bedrock/latest/userguide/model-customization-import-model.html#model-customization-import-model-architecture), checked on 2026-10-14, does not list NemotronH. Custom Model Import is therefore not a documented deployment path for this workshop artifact. That import list is distinct from native model availability in Bedrock; using a Bedrock judge also does not import the customized model.
+
 ## 1. Identify the model artifact
 
 Run the session setup and package-group naming cells. The package lookup selects the newest package in the group, so verify that its lineage matches the completed training job and evaluation you intend to deploy. Reusing a package group across experiments is normal; assuming the newest version is the approved version is not a deployment policy.
@@ -33,7 +35,7 @@ print(merged_model_s3_uri)
 
 The expected output shape is an S3 prefix ending in `checkpoints/hf_merged/`. It contains the base weights with the LoRA update applied, plus the configuration/tokenizer artifacts needed for loading. An adapter alone is not a standalone merged model. Confirm this prefix actually exists and contains the intended checkpoint; the path construction assumes the managed recipe's output layout.
 
-This track uses an uncompressed `S3Prefix`. Track 2 instead supplies one gzipped `model.tar.gz` object. Those data sources are not interchangeable: adding files beside an archive does not insert them inside the archive.
+This workflow uses an uncompressed `S3Prefix`. The 4B Training jobs journey instead supplies one gzipped `model.tar.gz` object. Those data sources are not interchangeable: adding files beside an archive does not insert them inside the archive.
 
 ## 2. Add the serving parser and configuration
 
@@ -88,7 +90,7 @@ All model weights must be available to the serving runtime, not just the subset 
 
 ## 4. Create the endpoint infrastructure first
 
-This notebook uses inference-component hosting: the production variant defines infrastructure without naming a model. Its actual resource order is **EndpointConfig, Endpoint, Model, InferenceComponent** after artifact preparation. Do not replace that order with Track 2's direct-model sequence.
+This notebook uses inference-component hosting: the production variant defines infrastructure without naming a model. Its actual resource order is **EndpointConfig, Endpoint, Model, InferenceComponent** after artifact preparation. Do not replace that order with the 4B Training jobs journey's direct-model sequence.
 
 The following excerpt is the creation branch of the notebook's get-first cell:
 
@@ -202,6 +204,12 @@ ic.wait_for_status("InService")
 
 The component selects the Model and reserves resources on the endpoint. Its accelerator allocation must match `SM_VLLM_TENSOR_PARALLEL_SIZE`; reserving fewer devices than the runtime expects can prevent initialization. Wait for **both** endpoint and component readiness before sending a request. A failure here should be investigated in the serving logs, not treated as a reason to retrain immediately.
 
+### Progress activity: inspect infrastructure and component separately
+
+In **Studio > Deployments > Endpoints**, or the [SageMaker AI console](https://console.aws.amazon.com/sagemaker/) under **Inference > Endpoints**, select the exact endpoint name in the correct Region. Follow its configuration and inspect the inference component's Model and resource allocation. Confirm one `ml.g5.12xlarge`, four component accelerators, and tensor parallel size four. Record both endpoint and component status; an endpoint ready before its component is not an invokable model.
+
+Open the endpoint's log link or [CloudWatch](https://console.aws.amazon.com/cloudwatch/) under **Logs > Log groups > `/aws/sagemaker/Endpoints/<endpoint-name>`**. Filter to the current attempt and inspect model loading, parser/plugin initialization, and health-check errors. While waiting, trace the Model's `S3Prefix` to the package and locate the two serving files added earlier. Do not substitute the 4B journey's archive handling or one-GPU instance settings.
+
 ## 7. Invoke one held-out contract
 
 Run the notebook's dataset-loading and runtime-client cells, then `ask_endpoint(doc)`. The invocation routes with both `EndpointName` and `InferenceComponentName`. The shortened excerpt below preserves the notebook's request shape and assumes `smr`, `doc`, and `labels` have been initialized:
@@ -229,13 +237,15 @@ text = payload["choices"][0]["message"]["content"]
 usage = payload.get("usage", {})
 ```
 
-Expect a chat-completion payload with final text at `choices[0].message.content` and, when provided, a `usage` object. The notebook prints elapsed time, parseability, and the number of returned checklist entries. These are shapes and checks, not promised performance results. Inspect the raw payload if content is absent or routed into a reasoning field.
+Expect a chat-completion payload with final text at `choices[0].message.content` and, when provided, a `usage` object. The notebook prints elapsed time, parseability, and the number of expected checklist keys present in the extracted object; it does not validate item schemas. These are shapes and checks, not promised performance results. Inspect the raw payload if content is absent or routed into a reasoning field.
 
-Apply an additional local schema checkpoint after the notebook's `parse_verdicts` call:
+The smoke test now uses `parse_answer` from the standalone scorer, not the evaluation utility's frontier parser. Apply an additional local schema checkpoint after that extraction:
 
 ```python
-pred = parse_verdicts(text)
-assert isinstance(pred, dict)
+from contractnli_scorer import parse_answer
+
+pred, ok = parse_answer(text)
+assert ok and isinstance(pred, dict)
 assert set(pred) == set(labels)
 span_ids = {i for i, _ in C.doc_spans(doc)}
 for item in pred.values():
